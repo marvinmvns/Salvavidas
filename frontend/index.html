@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salvavidas - Voice Translation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .conversation-area {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .config-section {
+            margin-bottom: 25px;
+        }
+
+        .config-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .config-item {
+            margin-bottom: 15px;
+        }
+
+        .config-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .config-item select,
+        .config-item input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .config-item select:focus,
+        .config-item input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-large {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            margin-top: 15px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.connected {
+            background: #48bb78;
+            box-shadow: 0 0 10px #48bb78;
+        }
+
+        .status-indicator.disconnected {
+            background: #f56565;
+        }
+
+        .status-indicator.recording {
+            background: #ed8936;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .speaker-info {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .timestamp {
+            color: #718096;
+        }
+
+        .message-content {
+            margin-bottom: 10px;
+        }
+
+        .original-text {
+            font-size: 1.1rem;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .translated-text {
+            font-size: 1.1rem;
+            color: #4a5568;
+            font-style: italic;
+            padding: 10px;
+            background: #edf2f7;
+            border-radius: 5px;
+        }
+
+        .suggestions {
+            margin-top: 10px;
+        }
+
+        .suggestions-title {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .suggestion-item {
+            display: inline-block;
+            margin: 3px;
+            padding: 6px 12px;
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .suggestion-item:hover {
+            background: #bae7ff;
+            transform: translateY(-2px);
+        }
+
+        .speakers-list {
+            margin-top: 15px;
+        }
+
+        .speaker-chip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: #f0f4ff;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .speaker-flag {
+            font-size: 1.2rem;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚁 Salvavidas</h1>
+            <p>Real-time Voice Translation with Speaker Identification</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Sidebar: Configuration -->
+            <div class="sidebar">
+                <div class="config-section">
+                    <h3>⚙️ Configuration</h3>
+
+                    <div class="config-item">
+                        <label>Processing Mode</label>
+                        <select id="processing_mode">
+                            <option value="local">Local (Free)</option>
+                            <option value="api_fast">API Fast ($$)</option>
+                            <option value="api_premium">API Premium ($$$)</option>
+                        </select>
+                    </div>
+
+                    <div class="config-item">
+                        <label>Target Language</label>
+                        <select id="target_language">
+                            <option value="en">English</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="ja">Japanese</option>
+                            <option value="zh">Chinese</option>
+                        </select>
+                    </div>
+
+                    <div class="config-item">
+                        <label>Latency Priority</label>
+                        <select id="latency_priority">
+                            <option value="realtime">Realtime (Fastest)</option>
+                            <option value="balanced">Balanced</option>
+                            <option value="quality">Quality (Best)</option>
+                        </select>
+                    </div>
+
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="enable_speaker_id" checked>
+                            Enable Speaker Identification
+                        </label>
+                    </div>
+
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="enable_suggestions" checked>
+                            Enable Response Suggestions
+                        </label>
+                    </div>
+
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="use_intel_gpu">
+                            Use Intel GPU (Local Mode)
+                        </label>
+                    </div>
+
+                    <button class="btn btn-primary btn-large" onclick="saveConfig()">
+                        Save Configuration
+                    </button>
+                </div>
+
+                <div class="config-section">
+                    <h3>👥 Known Speakers</h3>
+                    <div class="speakers-list" id="speakers-list">
+                        <p style="color: #718096; font-size: 0.9rem;">No speakers yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Control Panel -->
+                <div class="control-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span class="status-indicator" id="status-indicator"></span>
+                            <span id="status-text">Disconnected</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-success" id="start-btn" onclick="startRecording()">
+                                🎤 Start Recording
+                            </button>
+                            <button class="btn btn-danger" id="stop-btn" onclick="stopRecording()" style="display: none;">
+                                ⏹️ Stop Recording
+                            </button>
+                            <button class="btn btn-primary" onclick="clearConversation()">
+                                🗑️ Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conversation Area -->
+                <div class="conversation-area" id="conversation-area">
+                    <p style="text-align: center; color: #718096; margin-top: 50px;">
+                        Click "Start Recording" to begin...
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
