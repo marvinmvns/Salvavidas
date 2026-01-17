@@ -3,7 +3,7 @@ from typing import Optional
 from config.settings import Settings, ProcessingMode
 from .services.stt import WhisperSTTService, DeepgramSTTService
 from .services.tts import PiperTTSService, ElevenLabsTTSService
-from .services.speaker_id import PyannoteSpeak erIdentificationService
+from .services.speaker_id import PyannoteSpeakerIdentificationService
 from .services.translation import LocalTranslationService, DeepLTranslationService
 from .services.llm import LocalLLMService, OpenAILLMService
 from ..core.interfaces import (
@@ -76,7 +76,7 @@ class ServiceFactory:
     def create_speaker_id_service(self) -> ISpeakerIdentificationService:
         """Create Speaker ID service."""
         # Always use local for now (pyannote is very good)
-        return PyannoteSpeak erIdentificationService()
+        return PyannoteSpeakerIdentificationService()
 
     def create_translation_service(self) -> ITranslationService:
         """Create Translation service based on configuration."""
