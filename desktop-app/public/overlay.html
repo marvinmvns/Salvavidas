@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salvavidas Overlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent;
+            color: white;
+            overflow: hidden;
+            -webkit-app-region: drag; /* Make window draggable */
+            user-select: none;
+        }
+
+        .overlay-container {
+            width: 100%;
+            height: 100vh;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .overlay-header {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 10px 15px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            -webkit-app-region: no-drag;
+        }
+
+        .overlay-header h3 {
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .suggestion-card {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            -webkit-app-region: no-drag;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .suggestion-type {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .suggestion-text {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            margin-bottom: 10px;
+        }
+
+        .suggestion-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .listening-indicator {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 12px 15px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            -webkit-app-region: no-drag;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: #48bb78;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.3);
+            }
+        }
+
+        .listening-text {
+            font-size: 0.85rem;
+        }
+
+        .shortcuts-hint {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            margin-top: auto;
+        }
+
+        .invisible-to-capture {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(76, 175, 80, 0.9);
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            animation: fadeInOut 2s infinite;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay-container">
+        <div class="overlay-header">
+            <h3>
+                <span>🚁</span>
+                Salvavidas
+            </h3>
+            <button class="close-btn" onclick="closeOverlay()">×</button>
+        </div>
+
+        <div class="listening-indicator">
+            <div class="pulse"></div>
+            <div class="listening-text" id="listening-text">
+                Waiting for speech...
+            </div>
+        </div>
+
+        <div id="suggestions-container">
+            <!-- Suggestions will be added here dynamically -->
+        </div>
+
+        <div class="shortcuts-hint">
+            Ctrl+Shift+O: Toggle | Ctrl+Shift+I: Invisible | Ctrl+Shift+H: Hide All
+        </div>
+
+        <div class="invisible-to-capture">
+            📹 Invisible to Screen Capture
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection to backend
+        let ws = null;
+
+        function connectWebSocket() {
+            const serverUrl = 'ws://localhost:8000/ws/voice';
+            ws = new WebSocket(serverUrl);
+
+            ws.onopen = () => {
+                console.log('Connected to Salvavidas server');
+                document.getElementById('listening-text').textContent = 'Connected - Listening...';
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onerror = () => {
+                document.getElementById('listening-text').textContent = 'Connection error - Retrying...';
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onclose = () => {
+                document.getElementById('listening-text').textContent = 'Disconnected - Retrying...';
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function handleMessage(data) {
+            if (data.type === 'transcription') {
+                // Update listening text
+                document.getElementById('listening-text').textContent =
+                    data.original_text.substring(0, 40) + '...';
+
+                // Display suggestions
+                if (data.suggestions && data.suggestions.length > 0) {
+                    displaySuggestions(data.suggestions);
+                }
+            }
+        }
+
+        function displaySuggestions(suggestions) {
+            const container = document.getElementById('suggestions-container');
+
+            // Clear old suggestions
+            container.innerHTML = '';
+
+            // Show top 2 suggestions
+            suggestions.slice(0, 2).forEach((sug, index) => {
+                const card = document.createElement('div');
+                card.className = 'suggestion-card';
+                card.innerHTML = `
+                    <div class="suggestion-type">Suggestion ${index + 1}</div>
+                    <div class="suggestion-text">${sug.text}</div>
+                    <div class="suggestion-actions">
+                        <button class="btn btn-primary" onclick='useSuggestion(\`${sug.text}\`)'>
+                            Use
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function useSuggestion(text) {
+            // Copy to clipboard
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('Copied to clipboard!');
+            });
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(76, 175, 80, 0.95);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                animation: slideIn 0.3s ease-out;
+                z-index: 1000;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+
+        function closeOverlay() {
+            if (window.electronAPI) {
+                window.electronAPI.toggleOverlay();
+            }
+        }
+
+        // Connect on load
+        connectWebSocket();
+    </script>
+</body>
+</html>
