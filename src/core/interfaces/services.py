@@ -6,7 +6,12 @@ from ..entities import (
     Speaker,
     TranscriptionSegment,
     Translation,
-    SuggestionResponse
+    SuggestionResponse,
+    SentimentAnalysis,
+    ArgumentationSuggestion,
+    MeetingContext,
+    ObjectionContext,
+    MeetingSummary,
 )
 
 
@@ -109,4 +114,91 @@ class ILanguageModelService(ABC):
     @abstractmethod
     async def detect_language(self, text: str) -> str:
         """Detect the language of the text."""
+        pass
+
+
+class ISentimentAnalysisService(ABC):
+    """Interface for Sentiment Analysis services."""
+
+    @abstractmethod
+    async def analyze_sentiment(
+        self,
+        text: str,
+        language: Optional[str] = None
+    ) -> SentimentAnalysis:
+        """Analyze sentiment of text."""
+        pass
+
+    @abstractmethod
+    async def analyze_conversation_sentiment(
+        self,
+        conversation_history: List[str]
+    ) -> List[SentimentAnalysis]:
+        """Analyze sentiment progression through conversation."""
+        pass
+
+
+class IArgumentationEngineService(ABC):
+    """Interface for Argumentation Engine services."""
+
+    @abstractmethod
+    async def generate_argumentation_suggestions(
+        self,
+        text: str,
+        conversation_history: List[str],
+        meeting_context: MeetingContext,
+        target_language: str,
+        num_suggestions: int = 3
+    ) -> List[ArgumentationSuggestion]:
+        """Generate advanced argumentation-based suggestions."""
+        pass
+
+    @abstractmethod
+    async def handle_objection(
+        self,
+        objection_context: ObjectionContext,
+        conversation_history: List[str],
+        target_language: str
+    ) -> List[ArgumentationSuggestion]:
+        """Generate counter-arguments for objections."""
+        pass
+
+    @abstractmethod
+    async def suggest_closing_strategy(
+        self,
+        conversation_history: List[str],
+        meeting_context: MeetingContext,
+        target_language: str
+    ) -> List[ArgumentationSuggestion]:
+        """Suggest strategies to close/conclude the meeting."""
+        pass
+
+
+class IMeetingSummaryService(ABC):
+    """Interface for Meeting Summary services."""
+
+    @abstractmethod
+    async def generate_summary(
+        self,
+        meeting_id: str,
+        conversation_history: List[str],
+        sentiment_timeline: List[SentimentAnalysis]
+    ) -> MeetingSummary:
+        """Generate comprehensive meeting summary."""
+        pass
+
+    @abstractmethod
+    async def extract_action_items(
+        self,
+        conversation_history: List[str]
+    ) -> List[str]:
+        """Extract action items from conversation."""
+        pass
+
+    @abstractmethod
+    async def extract_key_topics(
+        self,
+        conversation_history: List[str]
+    ) -> List[str]:
+        """Extract key topics discussed."""
         pass

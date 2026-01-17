@@ -5,6 +5,9 @@ from .services import (
     ISpeakerIdentificationService,
     ITranslationService,
     ILanguageModelService,
+    ISentimentAnalysisService,
+    IArgumentationEngineService,
+    IMeetingSummaryService,
 )
 
 __all__ = [
@@ -13,4 +16,7 @@ __all__ = [
     "ISpeakerIdentificationService",
     "ITranslationService",
     "ILanguageModelService",
+    "ISentimentAnalysisService",
+    "IArgumentationEngineService",
+    "IMeetingSummaryService",
 ]
