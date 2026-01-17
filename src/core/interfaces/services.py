@@ -22,6 +22,14 @@ from ..entities.analytics import (
     ExportRequest,
     ExportResult,
 )
+from ..entities.speaker_management import (
+    SpeakerEnrollmentRequest,
+    SpeakerEnrollmentSession,
+    EnrolledSpeaker,
+    SpeakerIdentificationResult,
+    SpeakerUpdateRequest,
+    VoiceProfileQuality,
+)
 
 
 class ISpeechToTextService(ABC):
@@ -317,4 +325,97 @@ class IAnalyticsService(ABC):
         limit: int = 10
     ) -> List[SpeakerAnalytics]:
         """Get top speakers by talk time."""
+        pass
+
+
+class ISpeakerManagementService(ABC):
+    """Interface for Speaker Management service."""
+
+    @abstractmethod
+    async def start_enrollment(
+        self,
+        request: SpeakerEnrollmentRequest
+    ) -> SpeakerEnrollmentSession:
+        """Start a new speaker enrollment session."""
+        pass
+
+    @abstractmethod
+    async def add_enrollment_sample(
+        self,
+        session_id: str,
+        audio_chunk: AudioChunk
+    ) -> SpeakerEnrollmentSession:
+        """Add voice sample to enrollment session."""
+        pass
+
+    @abstractmethod
+    async def complete_enrollment(
+        self,
+        session_id: str
+    ) -> EnrolledSpeaker:
+        """Complete enrollment and create speaker profile."""
+        pass
+
+    @abstractmethod
+    async def cancel_enrollment(
+        self,
+        session_id: str
+    ) -> None:
+        """Cancel enrollment session."""
+        pass
+
+    @abstractmethod
+    async def identify_speaker(
+        self,
+        audio_chunk: AudioChunk
+    ) -> SpeakerIdentificationResult:
+        """Identify speaker from audio or detect new speaker."""
+        pass
+
+    @abstractmethod
+    async def get_all_speakers(
+        self
+    ) -> List[EnrolledSpeaker]:
+        """Get all enrolled speakers."""
+        pass
+
+    @abstractmethod
+    async def get_speaker(
+        self,
+        speaker_id: str
+    ) -> Optional[EnrolledSpeaker]:
+        """Get specific enrolled speaker."""
+        pass
+
+    @abstractmethod
+    async def update_speaker(
+        self,
+        request: SpeakerUpdateRequest
+    ) -> EnrolledSpeaker:
+        """Update speaker information."""
+        pass
+
+    @abstractmethod
+    async def delete_speaker(
+        self,
+        speaker_id: str
+    ) -> None:
+        """Delete enrolled speaker."""
+        pass
+
+    @abstractmethod
+    async def assess_voice_quality(
+        self,
+        speaker_id: str
+    ) -> VoiceProfileQuality:
+        """Assess quality of speaker's voice profile."""
+        pass
+
+    @abstractmethod
+    async def retrain_speaker(
+        self,
+        speaker_id: str,
+        audio_samples: List[AudioChunk]
+    ) -> EnrolledSpeaker:
+        """Retrain speaker voice profile with new samples."""
         pass
