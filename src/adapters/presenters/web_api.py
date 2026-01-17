@@ -15,6 +15,8 @@ from ..controllers import VoiceTranslationController, ConfigController
 from ...core.use_cases import ProcessVoiceTranslationUseCase
 from ...core.entities import AudioChunk
 from config.settings import get_settings
+from ...infrastructure.services.analytics import AnalyticsService
+from .analytics_api import create_analytics_router
 
 
 app = FastAPI(
@@ -32,9 +34,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
 # Global instances
 database: Database = None
 config_controller: ConfigController = None
+analytics_service: AnalyticsService = None
 
 
 class ConfigUpdate(BaseModel):
@@ -53,7 +59,7 @@ class SpeakerEnrollment(BaseModel):
 @app.on_event("startup")
 async def startup():
     """Initialize application."""
-    global database, config_controller
+    global database, config_controller, analytics_service
 
     # Initialize database
     database = Database()
@@ -61,6 +67,13 @@ async def startup():
 
     # Initialize config controller
     config_controller = ConfigController(database)
+
+    # Initialize analytics service
+    analytics_service = AnalyticsService()
+
+    # Mount analytics router
+    analytics_router = create_analytics_router(analytics_service)
+    app.include_router(analytics_router)
 
 
 @app.on_event("shutdown")
@@ -74,6 +87,13 @@ async def shutdown():
 async def get_index():
     """Serve frontend."""
     with open("frontend/index.html", "r") as f:
+        return f.read()
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def get_analytics():
+    """Serve analytics dashboard."""
+    with open("frontend/analytics.html", "r") as f:
         return f.read()
 
 

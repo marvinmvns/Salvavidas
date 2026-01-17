@@ -1,6 +1,7 @@
 """Service interfaces (ports) for Clean Architecture."""
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, List, Optional
+from datetime import datetime
 from ..entities import (
     AudioChunk,
     Speaker,
@@ -12,6 +13,14 @@ from ..entities import (
     MeetingContext,
     ObjectionContext,
     MeetingSummary,
+)
+from ..entities.analytics import (
+    MeetingAnalytics,
+    SpeakerAnalytics,
+    AnalyticsSummary,
+    TimeRange,
+    ExportRequest,
+    ExportResult,
 )
 
 
@@ -201,4 +210,111 @@ class IMeetingSummaryService(ABC):
         conversation_history: List[str]
     ) -> List[str]:
         """Extract key topics discussed."""
+        pass
+
+
+class IAnalyticsService(ABC):
+    """Interface for Analytics service."""
+
+    @abstractmethod
+    async def record_meeting_start(
+        self,
+        meeting_id: str,
+        meeting_type: str,
+        platform: str,
+        processing_mode: str
+    ) -> None:
+        """Record the start of a meeting."""
+        pass
+
+    @abstractmethod
+    async def record_meeting_end(
+        self,
+        meeting_id: str
+    ) -> MeetingAnalytics:
+        """Record the end of a meeting and return analytics."""
+        pass
+
+    @abstractmethod
+    async def record_transcription(
+        self,
+        meeting_id: str,
+        transcription: TranscriptionSegment,
+        speaker: Optional[Speaker] = None
+    ) -> None:
+        """Record a transcription segment."""
+        pass
+
+    @abstractmethod
+    async def record_sentiment(
+        self,
+        meeting_id: str,
+        sentiment: SentimentAnalysis,
+        speaker: Optional[Speaker] = None
+    ) -> None:
+        """Record sentiment analysis."""
+        pass
+
+    @abstractmethod
+    async def record_suggestion(
+        self,
+        meeting_id: str,
+        suggestion: ArgumentationSuggestion
+    ) -> None:
+        """Record a suggestion generated."""
+        pass
+
+    @abstractmethod
+    async def get_meeting_analytics(
+        self,
+        meeting_id: str
+    ) -> Optional[MeetingAnalytics]:
+        """Get analytics for a specific meeting."""
+        pass
+
+    @abstractmethod
+    async def get_summary(
+        self,
+        time_range: TimeRange,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> AnalyticsSummary:
+        """Get analytics summary for a time range."""
+        pass
+
+    @abstractmethod
+    async def get_speaker_analytics(
+        self,
+        speaker_id: str,
+        time_range: TimeRange = TimeRange.ALL_TIME
+    ) -> Optional[SpeakerAnalytics]:
+        """Get analytics for a specific speaker."""
+        pass
+
+    @abstractmethod
+    async def export_analytics(
+        self,
+        export_request: ExportRequest
+    ) -> ExportResult:
+        """Export analytics data to file."""
+        pass
+
+    @abstractmethod
+    async def get_sentiment_timeline(
+        self,
+        time_range: TimeRange,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        granularity: str = "hour"  # "minute", "hour", "day"
+    ) -> List[dict]:
+        """Get sentiment data over time for charting."""
+        pass
+
+    @abstractmethod
+    async def get_speaker_rankings(
+        self,
+        time_range: TimeRange,
+        limit: int = 10
+    ) -> List[SpeakerAnalytics]:
+        """Get top speakers by talk time."""
         pass
