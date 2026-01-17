@@ -15,6 +15,9 @@
 - 🔊 **Síntese de Voz** (TTS)
 - ⚡ **Zero Latência** (modo realtime otimizado)
 - 🖥️ **Frontend Web Parametrizável**
+- 🖥️ **Desktop App** (Electron - Windows/Mac/Linux)
+- 🌐 **Chrome Extension** (Meet/Zoom/Teams)
+- 💼 **Meeting Assistant Mode** (Sentiment Analysis + Suggestions)
 - 💾 **Banco SQLite para Configurações**
 - 🎯 **Clean Architecture + MVC**
 - 🧪 **100% Testado**
@@ -78,13 +81,34 @@ Salvavidas/
 │       │   ├── tts/             # Text-to-Speech
 │       │   ├── speaker_id/      # Speaker Identification
 │       │   ├── translation/     # Translation
-│       │   └── llm/             # Language Models
+│       │   ├── llm/             # Language Models
+│       │   ├── sentiment/       # Sentiment Analysis
+│       │   ├── argumentation/   # Argumentation Engine
+│       │   └── meeting_summary/ # Meeting Summary
 │       ├── models/              # MVC - Models (Database)
 │       ├── database.py
 │       └── service_factory.py
 ├── frontend/                     # Frontend Web
 │   ├── index.html
-│   └── app.js
+│   ├── app.js
+│   ├── index_premium.html
+│   └── app_premium.js
+├── desktop-app/                  # Desktop App (Electron)
+│   ├── main.js
+│   ├── renderer.js
+│   ├── package.json
+│   └── README.md
+├── chrome-extension/             # Chrome Extension
+│   ├── manifest.json
+│   ├── background/
+│   │   └── service-worker.js
+│   ├── content/
+│   │   ├── content.js
+│   │   └── overlay.css
+│   ├── popup/
+│   │   ├── popup.html
+│   │   └── popup.js
+│   └── README.md
 ├── tests/                        # Testes
 │   ├── unit/
 │   └── integration/
@@ -197,6 +221,61 @@ pytest tests/unit/
 ```bash
 pytest --cov=src --cov-report=html
 ```
+
+## 🖥️ Plataformas Disponíveis
+
+### Web Application (Principal)
+```bash
+python main.py web
+# Acesse: http://localhost:8000
+```
+
+A aplicação web oferece 3 versões de interface:
+- **Basic** (`index.html`) - Interface simples e leve
+- **Optimized** (`app_optimized.js`) - Performance otimizada
+- **Premium** (`index_premium.html`) - Todas as funcionalidades
+
+### Desktop App (Electron)
+```bash
+cd desktop-app
+npm install
+npm start
+```
+
+**Características:**
+- ✅ Overlay sempre visível
+- ✅ Invisível ao compartilhamento de tela
+- ✅ Atalhos globais (Ctrl+Shift+O/I/H)
+- ✅ Multi-platform (Windows/Mac/Linux)
+- ✅ WebSocket para backend
+- ✅ System tray integration
+
+### Chrome Extension
+```bash
+# 1. Certifique-se que o backend está rodando
+python main.py web
+
+# 2. Carregue a extensão no Chrome
+# - Abra chrome://extensions/
+# - Ative "Modo do desenvolvedor"
+# - Clique em "Carregar sem compactação"
+# - Selecione a pasta chrome-extension/
+```
+
+**Plataformas suportadas:**
+- ✅ Google Meet
+- ✅ Zoom
+- ✅ Microsoft Teams
+
+**Características:**
+- ✅ Overlay injected em reuniões
+- ✅ Captura de áudio da aba
+- ✅ Transcrição em tempo real
+- ✅ Análise de sentimento
+- ✅ Sugestões de resposta
+- ✅ Invisível ao screen sharing
+
+Ver [chrome-extension/README.md](chrome-extension/README.md) para documentação completa.
 
 ## 🌐 API Endpoints
 
