@@ -27,6 +27,10 @@ Aplicação desktop cross-platform com **modo invisível** para compartilhamento
 - Sempre on top (opcional)
 - Arrastar e soltar o overlay
 - Conecta ao servidor local (Python backend)
+- **🎤 Captura de áudio do Teams** (microfone + sistema)
+- **🤖 Auto-detecção de reuniões do Teams**
+- **📢 Notificações desktop** para início/fim de reuniões
+- **🔄 Auto-start overlay** quando reunião iniciada
 
 ---
 
@@ -143,6 +147,107 @@ O overlay é **draggable** (arrastável):
 - Show/Hide: Clique simples
 - Menu: Clique direito
 - Quit: Menu → Quit
+- **Teams Status:** 🟢 In Meeting / ⚪ Not Detected
+- **Auto-start Overlay:** Toggle checkbox
+
+---
+
+## 🎤 Captura de Áudio do Teams (NOVO!)
+
+### Como Funciona
+
+O Salvavidas Desktop App agora **captura automaticamente o áudio das reuniões do Teams**, incluindo:
+- ✅ **Sua voz** (microfone)
+- ✅ **Vozes dos participantes** (áudio do sistema)
+- ✅ **Mixagem em tempo real** sem interferir na conferência
+
+### Auto-Detecção de Reuniões
+
+O app detecta automaticamente quando você inicia uma reunião do Teams:
+
+**Windows:**
+- Monitora processo `Teams.exe`
+- Detecta janelas com "Meeting" | "Call" | "Video" no título
+
+**macOS:**
+- Usa AppleScript para detectar Microsoft Teams
+- Identifica reuniões por títulos de janela
+
+**Linux:**
+- Verifica processos Teams via `ps`
+- Usa `wmctrl` ou `xdotool` para nomes de janela (opcional)
+
+### Configuração
+
+1. **Auto-start Overlay**: No system tray, marque "Auto-start Overlay for Teams"
+   - Quando marcado, o overlay aparece automaticamente ao entrar em reunião
+   - Quando desmarcado, você precisa abrir manualmente
+
+2. **Captura de Áudio**: No overlay, clique em "● Start Capture"
+   - **Microfone + Sistema**: Captura sua voz E os participantes
+   - **Sem interferência**: Funciona em paralelo ao Teams
+   - **PCM 16-bit, 16kHz**: Formato otimizado para STT
+
+### Uso durante Reunião do Teams
+
+1. Entre na reunião do Teams normalmente
+2. O Salvavidas detecta automaticamente (notificação desktop)
+3. O overlay aparece (se auto-start ativado)
+4. Clique "● Start Capture" para iniciar
+5. Veja transcrições e traduções em tempo real!
+6. Clique "■ Stop Capture" para pausar
+7. Ao sair da reunião, o app detecta e para automaticamente
+
+### Notificações Desktop
+
+**Reunião Iniciada:**
+```
+┌──────────────────────────────────┐
+│ Teams Meeting Detected           │
+│ Salvavidas is ready to assist!   │
+└──────────────────────────────────┘
+```
+
+**Reunião Finalizada:**
+```
+┌──────────────────────────────────┐
+│ Teams Meeting Ended              │
+│ Thanks for using Salvavidas!     │
+└──────────────────────────────────┘
+```
+
+### Permissões Necessárias
+
+**Primeira vez:**
+- 🎤 **Microfone**: Para capturar sua voz
+- 🖥️ **Tela/Áudio do Sistema**: Para capturar vozes dos participantes
+- 🔔 **Notificações**: Para alertas de reunião
+
+O navegador/sistema pedirá permissão. Clique em **Permitir**.
+
+### Privacidade
+
+- ✅ Todo áudio é processado **localmente** (se STT local)
+- ✅ Nenhum dado é salvo sem sua permissão
+- ✅ Você controla start/stop da captura
+- ✅ Funciona sem gravar a reunião
+
+### Troubleshooting
+
+**Teams não detectado:**
+- Verifique se Teams está realmente aberto
+- (Linux) Instale wmctrl: `sudo apt install wmctrl xdotool`
+- Verifique logs no console: `[TeamsDetector]`
+
+**Captura de áudio falha:**
+- Permissões: Verifique se permitiu acesso a microfone + sistema
+- Chrome flags: Certifique-se que Electron tem permissões
+- Tente reiniciar o app desktop
+
+**Apenas microfone capturado (sem participantes):**
+- Alguns sistemas não suportam captura de áudio do sistema
+- Fallback: Use apenas microfone
+- Alternativa: Use Chrome Extension (captura direto da tab)
 
 ---
 

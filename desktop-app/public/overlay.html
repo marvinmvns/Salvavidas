@@ -181,6 +181,73 @@
             0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
         }
+
+        .audio-controls {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 12px 15px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            -webkit-app-region: no-drag;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .control-label {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .btn-record {
+            background: #f56565;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-record:hover {
+            background: #e53e3e;
+        }
+
+        .btn-record.recording {
+            background: #48bb78;
+        }
+
+        .btn-record.recording:hover {
+            background: #38a169;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #48bb78;
+        }
+
+        .status-dot.disconnected {
+            background: #f56565;
+        }
     </style>
 </head>
 <body>
@@ -191,6 +258,26 @@
                 Salvavidas
             </h3>
             <button class="close-btn" onclick="closeOverlay()">×</button>
+        </div>
+
+        <div class="audio-controls">
+            <div class="control-row">
+                <span class="control-label">🎤 Teams Audio Capture</span>
+                <span class="status-badge">
+                    <span class="status-dot" id="connection-dot"></span>
+                    <span id="connection-status">Disconnected</span>
+                </span>
+            </div>
+            <div class="control-row">
+                <button class="btn-record" id="record-btn" onclick="toggleRecording()">
+                    ● Start Capture
+                </button>
+            </div>
+            <div class="control-row">
+                <span style="font-size: 0.7rem; color: rgba(255, 255, 255, 0.6);">
+                    Captures: Microphone + System Audio
+                </span>
+            </div>
         </div>
 
         <div class="listening-indicator">
@@ -213,33 +300,92 @@
         </div>
     </div>
 
+    <!-- Audio Client Library -->
+    <script src="audio-client.js"></script>
+
     <script>
-        // WebSocket connection to backend
-        let ws = null;
+        // Audio client instance
+        let audioClient = null;
+        let isRecording = false;
 
-        function connectWebSocket() {
-            const serverUrl = 'ws://localhost:8000/ws/voice';
-            ws = new WebSocket(serverUrl);
+        // Initialize audio client
+        async function initializeAudioClient() {
+            try {
+                audioClient = new AudioClient('ws://localhost:8000/ws/voice');
 
-            ws.onopen = () => {
-                console.log('Connected to Salvavidas server');
-                document.getElementById('listening-text').textContent = 'Connected - Listening...';
-            };
+                // Setup event listeners
+                audioClient.on('ready', () => {
+                    updateConnectionStatus(true);
+                    console.log('[Overlay] Server ready');
+                });
 
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                handleMessage(data);
-            };
+                audioClient.on('transcription', handleMessage);
 
-            ws.onerror = () => {
-                document.getElementById('listening-text').textContent = 'Connection error - Retrying...';
-                setTimeout(connectWebSocket, 3000);
-            };
+                audioClient.on('error', (error) => {
+                    console.error('[Overlay] Server error:', error);
+                    document.getElementById('listening-text').textContent = `Error: ${error.message}`;
+                });
 
-            ws.onclose = () => {
-                document.getElementById('listening-text').textContent = 'Disconnected - Retrying...';
-                setTimeout(connectWebSocket, 3000);
-            };
+                audioClient.on('disconnected', () => {
+                    updateConnectionStatus(false);
+                    document.getElementById('listening-text').textContent = 'Disconnected from server';
+                });
+
+                // Initialize with Teams audio capture
+                await audioClient.initialize({
+                    captureMicrophone: true,
+                    captureSystemAudio: true,
+                    mixStreams: true,
+                    sampleRate: 16000
+                });
+
+                console.log('[Overlay] Audio client initialized');
+                updateConnectionStatus(true);
+
+            } catch (error) {
+                console.error('[Overlay] Failed to initialize audio client:', error);
+                document.getElementById('listening-text').textContent = `Init error: ${error.message}`;
+                updateConnectionStatus(false);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusDot = document.getElementById('connection-dot');
+            const statusText = document.getElementById('connection-status');
+
+            if (connected) {
+                statusDot.classList.remove('disconnected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.add('disconnected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        async function toggleRecording() {
+            if (!audioClient) {
+                alert('Audio client not initialized. Please wait...');
+                return;
+            }
+
+            const btn = document.getElementById('record-btn');
+
+            if (isRecording) {
+                // Stop recording
+                audioClient.stop();
+                isRecording = false;
+                btn.textContent = '● Start Capture';
+                btn.classList.remove('recording');
+                document.getElementById('listening-text').textContent = 'Stopped';
+
+            } else {
+                // Start recording
+                audioClient.start();
+                isRecording = true;
+                btn.textContent = '■ Stop Capture';
+                btn.classList.add('recording');
+                document.getElementById('listening-text').textContent = 'Capturing audio...';
+            }
         }
 
         function handleMessage(data) {
@@ -308,13 +454,44 @@
         }
 
         function closeOverlay() {
+            // Cleanup before closing
+            if (audioClient) {
+                audioClient.cleanup();
+            }
+
             if (window.electronAPI) {
                 window.electronAPI.toggleOverlay();
             }
         }
 
-        // Connect on load
-        connectWebSocket();
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[Overlay] DOM loaded, initializing audio client...');
+            initializeAudioClient().catch(error => {
+                console.error('[Overlay] Failed to initialize:', error);
+            });
+        });
+
+        // Listen for Teams meeting events
+        if (window.electronAPI && window.electronAPI.on) {
+            window.electronAPI.on('teams-meeting-started', (meetingInfo) => {
+                console.log('[Overlay] Teams meeting started:', meetingInfo);
+                showNotification('Teams meeting detected! Ready to assist.');
+                // Auto-start recording if not already recording
+                if (!isRecording) {
+                    setTimeout(() => toggleRecording(), 1000);
+                }
+            });
+
+            window.electronAPI.on('teams-meeting-ended', () => {
+                console.log('[Overlay] Teams meeting ended');
+                showNotification('Teams meeting ended. Thanks!');
+                // Auto-stop recording
+                if (isRecording) {
+                    toggleRecording();
+                }
+            });
+        }
     </script>
 </body>
 </html>
