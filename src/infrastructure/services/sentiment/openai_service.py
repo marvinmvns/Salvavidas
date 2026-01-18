@@ -2,6 +2,8 @@
 from typing import List, Optional
 from datetime import datetime
 import json
+import hashlib
+from functools import lru_cache
 
 from ....core.interfaces import ISentimentAnalysisService
 from ....core.entities import SentimentAnalysis, SentimentType
@@ -10,21 +12,56 @@ from ....core.entities import SentimentAnalysis, SentimentType
 class OpenAISentimentAnalysisService(ISentimentAnalysisService):
     """OpenAI-powered sentiment analysis for high accuracy."""
 
-    def __init__(self, api_key: str, model: str = "gpt-4"):
-        """Initialize OpenAI sentiment analyzer."""
+    def __init__(self, api_key: str, model: str = "gpt-4", cache_size: int = 128):
+        """Initialize OpenAI sentiment analyzer with LRU cache."""
         try:
             from openai import AsyncOpenAI
             self.client = AsyncOpenAI(api_key=api_key)
             self.model = model
+            # Simple LRU cache for repeated texts
+            self._cache: dict = {}
+            self._cache_order: list = []
+            self._cache_size = cache_size
         except ImportError:
             raise RuntimeError("openai package not installed. Run: pip install openai")
+
+    def _get_cache_key(self, text: str) -> str:
+        """Generate cache key from text hash."""
+        return hashlib.md5(text.encode()).hexdigest()
+
+    def _get_cached(self, key: str) -> Optional[SentimentAnalysis]:
+        """Get from cache and update LRU order."""
+        if key in self._cache:
+            # Move to end (most recently used)
+            self._cache_order.remove(key)
+            self._cache_order.append(key)
+            return self._cache[key]
+        return None
+
+    def _set_cached(self, key: str, value: SentimentAnalysis):
+        """Set in cache with LRU eviction."""
+        if key in self._cache:
+            # Already exists, move to end
+            self._cache_order.remove(key)
+        elif len(self._cache) >= self._cache_size:
+            # Evict oldest
+            oldest = self._cache_order.pop(0)
+            del self._cache[oldest]
+
+        self._cache[key] = value
+        self._cache_order.append(key)
 
     async def analyze_sentiment(
         self,
         text: str,
         language: Optional[str] = None
     ) -> SentimentAnalysis:
-        """Analyze sentiment using OpenAI GPT."""
+        """Analyze sentiment using OpenAI GPT with LRU cache."""
+        # Check cache first
+        cache_key = self._get_cache_key(text)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
 
         prompt = f"""Analyze the sentiment of the following text and provide:
 1. Overall sentiment (very_positive, positive, neutral, negative, very_negative, confused, concerned, excited)
@@ -76,13 +113,17 @@ Respond in JSON format:
                 SentimentType.NEUTRAL
             )
 
-            return SentimentAnalysis(
+            analysis = SentimentAnalysis(
                 sentiment=sentiment,
                 confidence=float(result.get("confidence", 0.8)),
                 emotion_scores=result.get("emotions", {}),
                 text_analyzed=text,
                 timestamp=datetime.now()
             )
+
+            # Cache the result
+            self._set_cached(cache_key, analysis)
+            return analysis
 
         except Exception as e:
             print(f"OpenAI sentiment analysis error: {e}")

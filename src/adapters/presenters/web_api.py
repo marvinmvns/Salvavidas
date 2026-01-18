@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 import asyncio
 import json
 from datetime import datetime
+import aiofiles
 
 from ...infrastructure.database import Database
 from ...infrastructure.service_factory import ServiceFactory
@@ -96,8 +97,8 @@ async def shutdown():
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
     """Serve frontend."""
-    with open("frontend/index.html", "r") as f:
-        return f.read()
+    async with aiofiles.open("frontend/index.html", "r") as f:
+        return await f.read()
 
 
 @app.get("/health")
@@ -118,15 +119,15 @@ async def health_check():
 @app.get("/analytics", response_class=HTMLResponse)
 async def get_analytics():
     """Serve analytics dashboard."""
-    with open("frontend/analytics.html", "r") as f:
-        return f.read()
+    async with aiofiles.open("frontend/analytics.html", "r") as f:
+        return await f.read()
 
 
 @app.get("/speakers", response_class=HTMLResponse)
 async def get_speakers():
     """Serve speaker management page."""
-    with open("frontend/speakers.html", "r") as f:
-        return f.read()
+    async with aiofiles.open("frontend/speakers.html", "r") as f:
+        return await f.read()
 
 
 @app.get("/api/config")

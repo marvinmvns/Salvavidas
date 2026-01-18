@@ -45,9 +45,9 @@ class WhisperSTTService(ISpeechToTextService):
             )
         )
 
-        # Get first segment
-        segment_list = list(segments)
-        if not segment_list:
+        # Get first segment (optimize: don't materialize entire list)
+        first_segment = next(segments, None)
+        if first_segment is None:
             return TranscriptionSegment(
                 text="",
                 speaker=Speaker(speaker_id="unknown"),
@@ -57,8 +57,6 @@ class WhisperSTTService(ISpeechToTextService):
                 start_time=0.0,
                 end_time=0.0
             )
-
-        first_segment = segment_list[0]
 
         return TranscriptionSegment(
             text=first_segment.text.strip(),
