@@ -14,8 +14,8 @@ faster-whisper==0.10.0
 torch==2.1.2
 torchaudio==2.1.2
 
-# Local Speaker Identification
-pyannote.audio==3.1.1
+# Local Speaker Identification & Management
+pyannote.audio==3.1.1  # Production speaker embeddings for enrollment & identification
 speechbrain==0.5.16
 
 # Local Translation

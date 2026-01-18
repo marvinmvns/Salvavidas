@@ -3,9 +3,10 @@
  * Cross-platform desktop app with invisible mode for screen sharing
  */
 
-const { app, BrowserWindow, globalShortcut, ipcMain, Menu, Tray, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, Menu, Tray, screen, Notification } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
+const TeamsDetector = require('./teams-detector');
 
 const store = new Store();
 
@@ -13,6 +14,10 @@ let mainWindow = null;
 let overlayWindow = null;
 let tray = null;
 let isInvisibleMode = false;
+let teamsDetector = null;
+
+// Auto-start overlay on Teams meetings (configurable)
+let autoStartOverlay = store.get('autoStartOverlay', true);
 
 // Disable hardware acceleration for better compatibility
 app.disableHardwareAcceleration();
@@ -121,6 +126,26 @@ function createTray() {
 
     tray = new Tray(iconPath);
 
+    updateTrayMenu();
+
+    tray.setToolTip('Salvavidas - Voice Translation');
+
+    // Click to show main window
+    tray.on('click', () => {
+        if (mainWindow) {
+            mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+        }
+    });
+}
+
+/**
+ * Update tray menu (called to refresh Teams status)
+ */
+function updateTrayMenu() {
+    if (!tray) return;
+
+    const teamsStatus = teamsDetector ? teamsDetector.getStatus() : { isInMeeting: false };
+
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'Show Salvavidas',
@@ -142,6 +167,21 @@ function createTray() {
         },
         { type: 'separator' },
         {
+            label: `Teams: ${teamsStatus.isInMeeting ? '🟢 In Meeting' : '⚪ Not Detected'}`,
+            enabled: false
+        },
+        {
+            label: 'Auto-start Overlay for Teams',
+            type: 'checkbox',
+            checked: autoStartOverlay,
+            click: () => {
+                autoStartOverlay = !autoStartOverlay;
+                store.set('autoStartOverlay', autoStartOverlay);
+                updateTrayMenu();
+            }
+        },
+        { type: 'separator' },
+        {
             label: 'Settings',
             click: () => {
                 // Open settings
@@ -160,15 +200,7 @@ function createTray() {
         }
     ]);
 
-    tray.setToolTip('Salvavidas - Voice Translation');
     tray.setContextMenu(contextMenu);
-
-    // Click to show main window
-    tray.on('click', () => {
-        if (mainWindow) {
-            mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
-        }
-    });
 }
 
 /**
@@ -245,12 +277,81 @@ function registerShortcuts() {
 }
 
 /**
+ * Initialize Teams meeting detector
+ */
+function initializeTeamsDetector() {
+    teamsDetector = new TeamsDetector();
+
+    // Handle meeting started
+    teamsDetector.on('meeting-started', (meetingInfo) => {
+        console.log('[App] Teams meeting detected:', meetingInfo);
+
+        // Update tray menu to show meeting status
+        updateTrayMenu();
+
+        // Send notification
+        if (Notification.isSupported()) {
+            new Notification({
+                title: 'Teams Meeting Detected',
+                body: 'Salvavidas is ready to assist!',
+                silent: false
+            }).show();
+        }
+
+        // Auto-start overlay if enabled
+        if (autoStartOverlay && !overlayWindow) {
+            console.log('[App] Auto-starting overlay for Teams meeting');
+            createOverlayWindow();
+        } else if (autoStartOverlay && overlayWindow && !overlayWindow.isVisible()) {
+            overlayWindow.show();
+        }
+
+        // Send event to renderer processes
+        if (mainWindow) {
+            mainWindow.webContents.send('teams-meeting-started', meetingInfo);
+        }
+        if (overlayWindow) {
+            overlayWindow.webContents.send('teams-meeting-started', meetingInfo);
+        }
+    });
+
+    // Handle meeting ended
+    teamsDetector.on('meeting-ended', (meetingInfo) => {
+        console.log('[App] Teams meeting ended');
+
+        // Update tray menu
+        updateTrayMenu();
+
+        // Send notification
+        if (Notification.isSupported()) {
+            new Notification({
+                title: 'Teams Meeting Ended',
+                body: 'Thanks for using Salvavidas!',
+                silent: true
+            }).show();
+        }
+
+        // Send event to renderer processes
+        if (mainWindow) {
+            mainWindow.webContents.send('teams-meeting-ended', meetingInfo);
+        }
+        if (overlayWindow) {
+            overlayWindow.webContents.send('teams-meeting-ended', meetingInfo);
+        }
+    });
+
+    // Start detecting
+    teamsDetector.start();
+}
+
+/**
  * App ready
  */
 app.whenReady().then(() => {
     createMainWindow();
     createTray();
     registerShortcuts();
+    initializeTeamsDetector(); // Initialize Teams auto-detection
 
     // Create app menu
     const menu = Menu.buildFromTemplate([
@@ -296,6 +397,11 @@ app.on('window-all-closed', () => {
  */
 app.on('will-quit', () => {
     globalShortcut.unregisterAll();
+
+    // Stop Teams detector
+    if (teamsDetector) {
+        teamsDetector.stop();
+    }
 });
 
 /**
@@ -307,8 +413,35 @@ ipcMain.handle('get-config', () => {
 
 ipcMain.handle('set-config', (event, key, value) => {
     store.set(key, value);
+
+    // Handle auto-start overlay setting
+    if (key === 'autoStartOverlay') {
+        autoStartOverlay = value;
+    }
+
     return true;
 });
 
 ipcMain.handle('toggle-overlay', toggleOverlay);
 ipcMain.handle('toggle-invisible', toggleInvisibleMode);
+
+// Teams detection IPC handlers
+ipcMain.handle('get-teams-status', async () => {
+    if (teamsDetector) {
+        return teamsDetector.getStatus();
+    }
+    return { isInMeeting: false, meetingInfo: null };
+});
+
+ipcMain.handle('force-teams-check', async () => {
+    if (teamsDetector) {
+        return await teamsDetector.forceCheck();
+    }
+    return { isInMeeting: false, meetingInfo: null };
+});
+
+ipcMain.handle('set-auto-start-overlay', (event, value) => {
+    autoStartOverlay = value;
+    store.set('autoStartOverlay', value);
+    return true;
+});

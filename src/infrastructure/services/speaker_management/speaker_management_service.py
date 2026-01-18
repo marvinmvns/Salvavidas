@@ -1,6 +1,7 @@
 """
 Speaker Management Service Implementation
 Handles speaker enrollment, identification, and profile management.
+Uses Pyannote.audio for production-ready speaker embeddings.
 """
 
 import uuid
@@ -20,22 +21,47 @@ from ....core.entities.speaker_management import (
     VoiceProfileQuality,
     EnrollmentStatus,
 )
+from .pyannote_embedding_service import create_embedding_service
 
 
 class SpeakerManagementService(ISpeakerManagementService):
     """
-    Speaker Management Service.
-    Manages speaker enrollment, identification, and voice profiles.
+    Speaker Management Service using Pyannote.audio embeddings.
+
+    Features:
+    - Production-ready speaker embeddings via Pyannote.audio
+    - Multi-sample enrollment for robust voice profiles
+    - Real-time speaker identification with confidence scoring
+    - Automatic fallback to hash-based embeddings if Pyannote unavailable
     """
 
-    def __init__(self, database_path: str = "speakers.db"):
+    def __init__(
+        self,
+        database_path: str = "speakers.db",
+        use_pyannote: bool = True,
+        pyannote_model: str = "pyannote/embedding",
+        huggingface_token: Optional[str] = None
+    ):
         """
         Initialize speaker management service.
 
         Args:
             database_path: Path to SQLite database for persistence
+            use_pyannote: Whether to use Pyannote.audio (recommended for production)
+            pyannote_model: Pyannote model name (default: pyannote/embedding)
+            huggingface_token: Hugging Face token for gated models
         """
         self.database_path = database_path
+
+        # Initialize embedding service (Pyannote or fallback)
+        self.embedding_service = create_embedding_service(
+            model_name=pyannote_model if use_pyannote else None,
+            use_auth_token=huggingface_token,
+            fallback_on_error=True
+        )
+
+        print(f"[SpeakerMgmt] Embedding service initialized: {type(self.embedding_service).__name__}")
+        print(f"[SpeakerMgmt] Embedding dimension: {self.embedding_service.get_embedding_dimension()}")
 
         # In-memory storage
         self.enrolled_speakers: Dict[str, EnrolledSpeaker] = {}
@@ -376,62 +402,45 @@ class SpeakerManagementService(ISpeakerManagementService):
 
     def _generate_voice_embedding(self, audio_samples: List[bytes]) -> np.ndarray:
         """
-        Generate voice embedding from audio samples.
+        Generate voice embedding from audio samples using Pyannote.audio.
 
-        In production, this would use:
-        - Pyannote.audio for speaker embeddings
-        - SpeechBrain
-        - WeSpeaker
-        - Or cloud service (Azure Speaker Recognition, AWS Transcribe, etc.)
+        Args:
+            audio_samples: List of audio byte arrays (PCM 16-bit)
 
-        For now, we generate a simple hash-based embedding for demonstration.
+        Returns:
+            Speaker embedding vector (512-dimensional for Pyannote, 128 for fallback)
         """
-        # Simplified embedding: hash-based features
-        # In production, use proper speaker embedding models
+        try:
+            embedding = self.embedding_service.generate_embedding(
+                audio_samples=audio_samples,
+                sample_rate=16000
+            )
+            return embedding
 
-        combined_audio = b''.join(audio_samples)
-
-        # Generate 128-dimensional embedding
-        embedding_size = 128
-        embedding = np.zeros(embedding_size)
-
-        # Simple hash-based features (just for demonstration)
-        for i in range(embedding_size):
-            # Use different parts of audio for different dimensions
-            chunk_size = len(combined_audio) // embedding_size
-            start = i * chunk_size
-            end = start + chunk_size
-
-            if end <= len(combined_audio):
-                chunk = combined_audio[start:end]
-                # Simple hash
-                hash_val = hash(chunk) % 1000000
-                embedding[i] = hash_val / 1000000.0
-
-        # Normalize
-        norm = np.linalg.norm(embedding)
-        if norm > 0:
-            embedding = embedding / norm
-
-        return embedding
+        except Exception as e:
+            print(f"[SpeakerMgmt] Error generating embedding: {e}")
+            # Return zero embedding on error
+            dim = self.embedding_service.get_embedding_dimension()
+            return np.zeros(dim)
 
     def _calculate_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
         Calculate cosine similarity between two embeddings.
 
-        Returns value between 0 and 1 (higher = more similar).
+        Args:
+            embedding1: First speaker embedding
+            embedding2: Second speaker embedding
+
+        Returns:
+            Similarity score between 0 and 1 (higher = more similar)
         """
-        # Cosine similarity
-        dot_product = np.dot(embedding1, embedding2)
-        norm1 = np.linalg.norm(embedding1)
-        norm2 = np.linalg.norm(embedding2)
+        try:
+            similarity = self.embedding_service.calculate_similarity(
+                embedding1=embedding1,
+                embedding2=embedding2
+            )
+            return similarity
 
-        if norm1 == 0 or norm2 == 0:
+        except Exception as e:
+            print(f"[SpeakerMgmt] Error calculating similarity: {e}")
             return 0.0
-
-        similarity = dot_product / (norm1 * norm2)
-
-        # Convert to 0-1 range (cosine similarity is -1 to 1)
-        similarity = (similarity + 1) / 2
-
-        return float(similarity)
