@@ -1,0 +1,107 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+docker/
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Tests
+tests/
+*.test.py
+test_*.py
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development
+.env.local
+.env.development
+.env.test
+
+# Desktop app
+desktop-app/
+electron-dist/
+node_modules/
+
+# Android
+android-client/
+
+# ESP32
+esp32-client/
+
+# Chrome extension
+chrome-extension/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Data directories (keep structure, ignore content)
+data/*
+!data/.gitkeep
+
+# Models (download at runtime)
+models/*.bin
+models/*.pt
+models/*.onnx
+
+# Backups
+*.bak
+*.backup

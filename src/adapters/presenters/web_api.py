@@ -100,6 +100,21 @@ async def get_index():
         return f.read()
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0",
+        "services": {
+            "database": "ready" if database else "not_initialized",
+            "analytics": "ready" if analytics_service else "not_initialized",
+            "speaker_management": "ready" if speaker_service else "not_initialized"
+        }
+    }
+
+
 @app.get("/analytics", response_class=HTMLResponse)
 async def get_analytics():
     """Serve analytics dashboard."""

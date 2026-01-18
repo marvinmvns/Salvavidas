@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Salvavidas Backend (FastAPI)
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile
+    container_name: salvavidas-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data
+      - speaker-data:/app/data/speakers
+      - analytics-data:/app/data/analytics
+      - model-cache:/app/data/models
+      # Configuration
+      - ../src:/app/src:ro
+      - ../frontend:/app/frontend:ro
+      - ./.env:/app/.env:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+      # Processing mode
+      - PROCESSING_MODE=${PROCESSING_MODE:-local}
+      - USE_INTEL_GPU=${USE_INTEL_GPU:-false}
+      # API Keys (from .env)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY:-}
+      - DEEPL_API_KEY=${DEEPL_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}
+    networks:
+      - salvavidas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+  # Nginx Reverse Proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: salvavidas-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ../frontend:/usr/share/nginx/html/static:ro
+    depends_on:
+      - backend
+    networks:
+      - salvavidas-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database (optional, for future use)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: salvavidas-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: salvavidas
+  #     POSTGRES_USER: salvavidas
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - salvavidas-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U salvavidas"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Redis Cache (optional, for future use)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: salvavidas-redis
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - salvavidas-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  salvavidas-network:
+    driver: bridge
+
+volumes:
+  speaker-data:
+    driver: local
+  analytics-data:
+    driver: local
+  model-cache:
+    driver: local
+  # postgres-data:
+  #   driver: local
+  # redis-data:
+  #   driver: local
