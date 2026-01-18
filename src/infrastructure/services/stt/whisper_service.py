@@ -13,8 +13,8 @@ from ....core.entities import AudioChunk, TranscriptionSegment, Speaker
 class WhisperSTTService(ISpeechToTextService):
     """Local Whisper STT service for low-latency transcription."""
 
-    def __init__(self, model_size: str = "base", device: str = "cpu"):
-        """Initialize Whisper model."""
+    def __init__(self, model_size: str = "large-v3", device: str = "cpu"):
+        """Initialize Whisper model (using v3-turbo by default)."""
         self.model = WhisperModel(
             model_size,
             device=device,

@@ -212,6 +212,10 @@ Edite `.env` com suas configurações:
 # Modo de processamento
 PROCESSING_MODE=local  # local | fast | premium
 
+# Modelos de IA (PROCESSING_MODE=local)
+WHISPER_MODEL=large-v3  # Whisper v3-turbo para STT
+SKIP_MODEL_DOWNLOAD=false  # Pular download automático de modelos
+
 # API Keys (opcionais)
 OPENAI_API_KEY=sk-xxxxx
 DEEPGRAM_API_KEY=xxxxx
@@ -222,6 +226,57 @@ TARGET_LANGUAGE=en
 ENABLE_SPEAKER_ID=true
 ENABLE_SUGGESTIONS=true
 ```
+
+### 🤖 Download Automático de Modelos
+
+Quando `PROCESSING_MODE=local`, o Docker baixa automaticamente os modelos de IA necessários:
+
+**Modelos baixados:**
+- **Whisper large-v3** (~1.5GB) - Speech-to-Text
+- **Helsinki-NLP/opus-mt-en-pt** (~500MB) - Tradução
+- **Pyannote embedding** (~200MB) - Identificação de falantes
+- **Llama-2-7B-Chat** (~4GB) - LLM local
+- **Piper TTS voice** (~50MB) - Text-to-Speech
+
+**Total:** ~6-7GB de modelos
+
+O download ocorre automaticamente no **primeiro start** do container:
+
+```bash
+# Logs mostram o download
+docker-compose logs -f backend
+
+🤖 Salvavidas Model Downloader
+📦 Processing mode: local
+📁 Models directory: /app/data/models
+
+[1/5] Whisper v3-turbo (STT)
+📥 Downloading Whisper model: large-v3...
+✅ Whisper large-v3 downloaded successfully!
+
+[2/5] Translation
+📥 Downloading Translation model...
+✅ Translation model downloaded successfully!
+
+...
+✅ Model download complete!
+```
+
+**Configurações:**
+
+```env
+# Usar Whisper base (menor, mais rápido)
+WHISPER_MODEL=base
+
+# Usar Whisper large-v3 (melhor qualidade - PADRÃO)
+WHISPER_MODEL=large-v3
+
+# Pular download (se já tiver os modelos)
+SKIP_MODEL_DOWNLOAD=true
+```
+
+**Volumes persistentes:**
+Os modelos são salvos no volume `model-cache` e **não precisam ser baixados novamente** em restarts.
 
 ### Portas
 

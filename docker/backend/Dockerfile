@@ -41,6 +41,13 @@ COPY src/ ./src/
 COPY frontend/ ./frontend/
 COPY .env.example .env
 
+# Copy model downloader and entrypoint
+COPY docker/backend/download-models.py /app/download-models.py
+COPY docker/backend/entrypoint.sh /app/entrypoint.sh
+
+# Make scripts executable
+RUN chmod +x /app/download-models.py /app/entrypoint.sh
+
 # Create data directories
 RUN mkdir -p data/speakers data/analytics data/models
 
@@ -51,5 +58,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run application
-CMD ["uvicorn", "src.adapters.presenters.web_api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Use entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]

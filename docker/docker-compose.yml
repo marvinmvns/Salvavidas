@@ -25,6 +25,9 @@ services:
       # Processing mode
       - PROCESSING_MODE=${PROCESSING_MODE:-local}
       - USE_INTEL_GPU=${USE_INTEL_GPU:-false}
+      # Model configuration
+      - WHISPER_MODEL=${WHISPER_MODEL:-large-v3}
+      - SKIP_MODEL_DOWNLOAD=${SKIP_MODEL_DOWNLOAD:-false}
       # API Keys (from .env)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY:-}
