@@ -231,6 +231,18 @@ function displayConversationTurn(data) {
     const timestamp = new Date(data.timestamp).toLocaleTimeString();
     const speakerFlag = languageFlags[data.speaker_language] || '🗣️';
 
+    // Speaker identification badge
+    let speakerBadgeHTML = '';
+    if (data.is_enrolled_speaker) {
+        const confidencePercent = Math.round((data.speaker_confidence || 0) * 100);
+        speakerBadgeHTML = `<span class="speaker-badge enrolled" title="Enrolled speaker - ${confidencePercent}% confidence">✓ ${confidencePercent}%</span>`;
+    } else if (data.is_new_speaker) {
+        speakerBadgeHTML = `<span class="speaker-badge new" title="Unknown speaker detected">? New</span>`;
+    }
+
+    // Speaker email if available
+    const emailHTML = data.speaker_email ? `<span style="color: #94a3b8; font-size: 11px; margin-left: 8px;">${data.speaker_email}</span>` : '';
+
     let suggestionsHTML = '';
     if (data.suggestions && data.suggestions.length > 0) {
         suggestionsHTML = `
@@ -248,7 +260,9 @@ function displayConversationTurn(data) {
     messageDiv.innerHTML = `
         <div class="message-header">
             <div class="speaker-info">
-                ${speakerFlag} ${data.speaker_name || data.speaker_id}
+                ${speakerFlag} <strong>${data.speaker_name || data.speaker_id}</strong>
+                ${speakerBadgeHTML}
+                ${emailHTML}
             </div>
             <div class="timestamp">${timestamp}</div>
         </div>

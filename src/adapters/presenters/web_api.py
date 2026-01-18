@@ -164,6 +164,9 @@ async def websocket_voice_translation(websocket: WebSocket):
     """WebSocket endpoint for real-time voice translation."""
     await websocket.accept()
 
+    meeting_id = None
+    session_start_time = datetime.now()
+
     try:
         # Get settings
         settings = get_settings()
@@ -193,8 +196,11 @@ async def websocket_voice_translation(websocket: WebSocket):
         controller = VoiceTranslationController(use_case, database)
         await controller.initialize()
 
+        # Start analytics meeting session
+        meeting_id = await analytics_service.record_meeting_start()
+
         # Send ready signal
-        await websocket.send_json({"type": "ready"})
+        await websocket.send_json({"type": "ready", "meeting_id": meeting_id})
 
         # Process audio stream
         while True:
@@ -214,18 +220,50 @@ async def websocket_voice_translation(websocket: WebSocket):
                     duration_ms=len(audio_data) / (settings.sample_rate * 2) * 1000
                 )
 
-                # Process
+                # Identify speaker using speaker management service
+                speaker_result = await speaker_service.identify_speaker(audio_chunk)
+
+                # Process translation
                 conversation_turn = await controller.process_audio(
                     audio_chunk,
                     source_language=settings.source_language
                 )
 
-                # Send result
+                # Use identified speaker if available, otherwise use fallback
+                if speaker_result.identified and speaker_result.speaker:
+                    identified_speaker = speaker_result.speaker
+                    speaker_confidence = speaker_result.confidence
+
+                    # Update speaker stats
+                    await speaker_service.update_speaker_stats(
+                        identified_speaker.speaker_id,
+                        talk_time_seconds=audio_chunk.duration_ms / 1000
+                    )
+                else:
+                    # Unknown speaker
+                    identified_speaker = None
+                    speaker_confidence = 0.0
+
+                # Record analytics
+                await analytics_service.record_transcription(
+                    meeting_id=meeting_id,
+                    speaker_id=identified_speaker.speaker_id if identified_speaker else "unknown",
+                    speaker_name=identified_speaker.name if identified_speaker else speaker_result.suggested_name,
+                    text=conversation_turn.transcription.text,
+                    language=conversation_turn.transcription.language,
+                    duration_seconds=audio_chunk.duration_ms / 1000
+                )
+
+                # Send result with speaker identification
                 result = {
                     "type": "transcription",
-                    "speaker_id": conversation_turn.speaker.speaker_id,
-                    "speaker_name": conversation_turn.speaker.name,
+                    "speaker_id": identified_speaker.speaker_id if identified_speaker else "unknown",
+                    "speaker_name": identified_speaker.name if identified_speaker else speaker_result.suggested_name,
+                    "speaker_email": identified_speaker.email if identified_speaker else None,
                     "speaker_language": conversation_turn.transcription.language,
+                    "speaker_confidence": speaker_confidence,
+                    "is_enrolled_speaker": speaker_result.identified,
+                    "is_new_speaker": speaker_result.is_new_speaker,
                     "original_text": conversation_turn.transcription.text,
                     "translated_text": conversation_turn.translation.translated_text,
                     "source_language": conversation_turn.translation.source_language,
@@ -252,7 +290,18 @@ async def websocket_voice_translation(websocket: WebSocket):
                     await websocket.send_json({"type": "history_cleared"})
 
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        print(f"[WebSocket] Client disconnected - session duration: {(datetime.now() - session_start_time).total_seconds():.1f}s")
+        # End analytics meeting
+        if meeting_id:
+            await analytics_service.record_meeting_end(meeting_id)
     except Exception as e:
-        print(f"WebSocket error: {e}")
-        await websocket.send_json({"type": "error", "message": str(e)})
+        print(f"[WebSocket] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except:
+            pass
+        # End analytics meeting on error
+        if meeting_id:
+            await analytics_service.record_meeting_end(meeting_id)

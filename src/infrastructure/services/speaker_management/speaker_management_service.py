@@ -328,6 +328,50 @@ class SpeakerManagementService(ISpeakerManagementService):
 
         return speaker
 
+    async def update_speaker_stats(
+        self,
+        speaker_id: str,
+        talk_time_seconds: float = 0.0,
+        increment_meetings: bool = False,
+        recognition_success: bool = True
+    ) -> None:
+        """
+        Update speaker statistics during real-time usage.
+
+        Args:
+            speaker_id: Speaker ID to update
+            talk_time_seconds: Add to total talk time
+            increment_meetings: Increment total meetings counter
+            recognition_success: Whether recognition was successful (for accuracy tracking)
+        """
+        speaker = self.enrolled_speakers.get(speaker_id)
+
+        if not speaker:
+            return  # Silently ignore if speaker not found
+
+        # Update talk time
+        if talk_time_seconds > 0:
+            speaker.total_talk_time_seconds += int(talk_time_seconds)
+
+        # Update meeting count
+        if increment_meetings:
+            speaker.total_meetings += 1
+
+        # Update recognition accuracy (running average)
+        if recognition_success:
+            # Simple running average: new_avg = (old_avg * n + new_value) / (n + 1)
+            total_recognitions = speaker.total_meetings * 10  # Rough estimate
+            current_total = speaker.recognition_accuracy * total_recognitions
+            speaker.recognition_accuracy = (current_total + 1.0) / (total_recognitions + 1)
+        else:
+            total_recognitions = speaker.total_meetings * 10
+            current_total = speaker.recognition_accuracy * total_recognitions
+            speaker.recognition_accuracy = (current_total + 0.0) / (total_recognitions + 1)
+
+        # Update last seen
+        speaker.last_seen = datetime.now()
+        speaker.updated_at = datetime.now()
+
     # Helper methods
 
     def _generate_voice_embedding(self, audio_samples: List[bytes]) -> np.ndarray:
