@@ -17,6 +17,8 @@ from ...core.entities import AudioChunk
 from config.settings import get_settings
 from ...infrastructure.services.analytics import AnalyticsService
 from .analytics_api import create_analytics_router
+from ...infrastructure.services.speaker_management import SpeakerManagementService
+from .speaker_api import create_speaker_router
 
 
 app = FastAPI(
@@ -41,6 +43,7 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 database: Database = None
 config_controller: ConfigController = None
 analytics_service: AnalyticsService = None
+speaker_service: SpeakerManagementService = None
 
 
 class ConfigUpdate(BaseModel):
@@ -59,7 +62,7 @@ class SpeakerEnrollment(BaseModel):
 @app.on_event("startup")
 async def startup():
     """Initialize application."""
-    global database, config_controller, analytics_service
+    global database, config_controller, analytics_service, speaker_service
 
     # Initialize database
     database = Database()
@@ -71,9 +74,16 @@ async def startup():
     # Initialize analytics service
     analytics_service = AnalyticsService()
 
+    # Initialize speaker management service
+    speaker_service = SpeakerManagementService()
+
     # Mount analytics router
     analytics_router = create_analytics_router(analytics_service)
     app.include_router(analytics_router)
+
+    # Mount speaker management router
+    speaker_router = create_speaker_router(speaker_service)
+    app.include_router(speaker_router)
 
 
 @app.on_event("shutdown")
@@ -94,6 +104,13 @@ async def get_index():
 async def get_analytics():
     """Serve analytics dashboard."""
     with open("frontend/analytics.html", "r") as f:
+        return f.read()
+
+
+@app.get("/speakers", response_class=HTMLResponse)
+async def get_speakers():
+    """Serve speaker management page."""
+    with open("frontend/speakers.html", "r") as f:
         return f.read()
 
 
