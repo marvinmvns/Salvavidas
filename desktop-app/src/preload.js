@@ -11,12 +11,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getConfig: () => ipcRenderer.invoke('get-config'),
     setConfig: (key, value) => ipcRenderer.invoke('set-config', key, value),
 
+    // Settings
+    getSettings: () => ipcRenderer.invoke('get-settings'),
+    saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+    clearCache: () => ipcRenderer.invoke('clear-cache'),
+    clearSpeakers: () => ipcRenderer.invoke('clear-speakers'),
+
     // Controls
     toggleOverlay: () => ipcRenderer.invoke('toggle-overlay'),
     toggleInvisible: () => ipcRenderer.invoke('toggle-invisible'),
 
     // Events
     onOpenSettings: (callback) => ipcRenderer.on('open-settings', callback),
+    on: (channel, callback) => {
+        // Whitelist of allowed channels
+        const validChannels = ['teams-meeting-started', 'teams-meeting-ended'];
+        if (validChannels.includes(channel)) {
+            ipcRenderer.on(channel, callback);
+        }
+    },
 
     // Platform info
     platform: process.platform,

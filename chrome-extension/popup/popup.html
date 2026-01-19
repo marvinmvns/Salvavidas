@@ -354,15 +354,30 @@
         <div class="control-group">
           <label for="language">Target Language</label>
           <select id="language">
+            <option value="en">🇺🇸 English</option>
+            <option value="pt">🇧🇷 Portuguese</option>
+            <option value="es">🇪🇸 Spanish</option>
+            <option value="fr">🇫🇷 French</option>
+            <option value="de">🇩🇪 German</option>
+            <option value="it">🇮🇹 Italian</option>
+            <option value="zh">🇨🇳 Chinese</option>
+            <option value="ja">🇯🇵 Japanese</option>
+            <option value="ko">🇰🇷 Korean</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="source-language">Source Language</label>
+          <select id="source-language">
+            <option value="">Auto-detect</option>
             <option value="en">English</option>
-            <option value="es">Spanish</option>
             <option value="pt">Portuguese</option>
+            <option value="es">Spanish</option>
             <option value="fr">French</option>
             <option value="de">German</option>
             <option value="it">Italian</option>
             <option value="zh">Chinese</option>
             <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
           </select>
         </div>
 
@@ -370,6 +385,34 @@
           <div class="checkbox-group">
             <input type="checkbox" id="auto-start" />
             <label for="auto-start" class="checkbox-label">Auto-start on meeting pages</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="enable-speaker-id" checked />
+            <label for="enable-speaker-id" class="checkbox-label">Enable Speaker Identification</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="enable-suggestions" checked />
+            <label for="enable-suggestions" class="checkbox-label">Enable AI Suggestions</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="enable-sentiment" checked />
+            <label for="enable-sentiment" class="checkbox-label">Enable Sentiment Analysis</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="show-latency" checked />
+            <label for="show-latency" class="checkbox-label">Show Performance Monitor</label>
           </div>
         </div>
       </div>

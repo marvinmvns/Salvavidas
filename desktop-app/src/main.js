@@ -12,6 +12,7 @@ const store = new Store();
 
 let mainWindow = null;
 let overlayWindow = null;
+let settingsWindow = null;
 let tray = null;
 let isInvisibleMode = false;
 let teamsDetector = null;
@@ -119,6 +120,51 @@ function createOverlayWindow() {
 }
 
 /**
+ * Create settings window
+ */
+function createSettingsWindow() {
+    // Don't create multiple settings windows
+    if (settingsWindow) {
+        settingsWindow.show();
+        settingsWindow.focus();
+        return settingsWindow;
+    }
+
+    settingsWindow = new BrowserWindow({
+        width: 900,
+        height: 700,
+        minWidth: 800,
+        minHeight: 600,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
+        },
+        icon: path.join(__dirname, '../build/icon.png'),
+        title: 'Configurações - Salvavidas',
+        backgroundColor: '#1a202c',
+        parent: mainWindow,
+        modal: false,
+        show: false,
+        autoHideMenuBar: true
+    });
+
+    // Load settings HTML
+    settingsWindow.loadFile(path.join(__dirname, '../public/settings.html'));
+
+    // Show when ready
+    settingsWindow.once('ready-to-show', () => {
+        settingsWindow.show();
+    });
+
+    settingsWindow.on('closed', () => {
+        settingsWindow = null;
+    });
+
+    return settingsWindow;
+}
+
+/**
  * Create system tray
  */
 function createTray() {
@@ -184,10 +230,7 @@ function updateTrayMenu() {
         {
             label: 'Settings',
             click: () => {
-                // Open settings
-                if (mainWindow) {
-                    mainWindow.webContents.send('open-settings');
-                }
+                createSettingsWindow();
             }
         },
         { type: 'separator' },
@@ -273,6 +316,11 @@ function registerShortcuts() {
     globalShortcut.register('CommandOrControl+Shift+H', () => {
         if (mainWindow) mainWindow.hide();
         if (overlayWindow) overlayWindow.hide();
+    });
+
+    // Ctrl+,: Open settings
+    globalShortcut.register('CommandOrControl+,', () => {
+        createSettingsWindow();
     });
 }
 
@@ -360,6 +408,8 @@ app.whenReady().then(() => {
             submenu: [
                 { label: 'About', role: 'about' },
                 { type: 'separator' },
+                { label: 'Settings...', accelerator: 'CmdOrCtrl+,', click: () => createSettingsWindow() },
+                { type: 'separator' },
                 { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
             ]
         },
@@ -443,5 +493,42 @@ ipcMain.handle('force-teams-check', async () => {
 ipcMain.handle('set-auto-start-overlay', (event, value) => {
     autoStartOverlay = value;
     store.set('autoStartOverlay', value);
+    return true;
+});
+
+/**
+ * Settings IPC handlers
+ */
+ipcMain.handle('get-settings', () => {
+    // Return all settings from store
+    return store.store;
+});
+
+ipcMain.handle('save-settings', (event, settings) => {
+    // Save all settings to store
+    for (const [key, value] of Object.entries(settings)) {
+        store.set(key, value);
+    }
+
+    // Update runtime values that affect app behavior
+    if (settings.autoStartOverlay !== undefined) {
+        autoStartOverlay = settings.autoStartOverlay;
+    }
+
+    return true;
+});
+
+ipcMain.handle('clear-cache', async () => {
+    // Clear cache-related settings
+    // Note: Actual model cache clearing should be done by the backend
+    console.log('[App] Cache clear requested');
+    return true;
+});
+
+ipcMain.handle('clear-speakers', async () => {
+    // Clear speaker-related settings
+    store.delete('speakers');
+    store.delete('speaker_embeddings');
+    console.log('[App] Speakers cleared');
     return true;
 });

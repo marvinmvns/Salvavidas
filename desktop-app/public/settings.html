@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salvavidas - Configurações</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .settings-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .settings-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .settings-header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .settings-header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f7fafc;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #4a5568;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab.active {
+            color: #667eea;
+            background: white;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+
+        .tab-content {
+            padding: 30px;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-description {
+            color: #718096;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .form-label .badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-control:disabled {
+            background: #f7fafc;
+            cursor: not-allowed;
+        }
+
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .toggle-label {
+            font-weight: 500;
+            color: #2d3748;
+        }
+
+        .toggle-description {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e0;
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .radio-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .radio-option {
+            position: relative;
+        }
+
+        .radio-option input {
+            position: absolute;
+            opacity: 0;
+        }
+
+        .radio-option label {
+            display: block;
+            padding: 15px;
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .radio-option input:checked + label {
+            background: #eef2ff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .radio-option label:hover {
+            border-color: #667eea;
+        }
+
+        .radio-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+
+        .radio-description {
+            font-size: 0.85rem;
+            color: #718096;
+        }
+
+        .key-value-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .key-value-item {
+            display: grid;
+            grid-template-columns: 1fr 2fr auto;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 20px 30px;
+            background: #f7fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .alert-info {
+            background: #ebf8ff;
+            color: #2c5282;
+            border: 1px solid #bee3f8;
+        }
+
+        .alert-warning {
+            background: #fffaf0;
+            color: #744210;
+            border: 1px solid #feebc8;
+        }
+
+        .shortcut-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .shortcut-key {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #2d3748;
+            color: white;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <div class="settings-header">
+            <h1>🚁 Salvavidas - Configurações</h1>
+            <p>Configure todas as funcionalidades do sistema</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('general')">🎛️ Geral</button>
+            <button class="tab" onclick="switchTab('ai')">🤖 IA & Modelos</button>
+            <button class="tab" onclick="switchTab('audio')">🎤 Áudio</button>
+            <button class="tab" onclick="switchTab('teams')">💼 Teams</button>
+            <button class="tab" onclick="switchTab('shortcuts')">⌨️ Atalhos</button>
+            <button class="tab" onclick="switchTab('advanced')">⚙️ Avançado</button>
+        </div>
+
+        <!-- TAB: Geral -->
+        <div id="tab-general" class="tab-content active">
+            <div class="section">
+                <h3 class="section-title">🌍 Idiomas</h3>
+                <div class="form-group">
+                    <label class="form-label">Idioma de destino (tradução)</label>
+                    <select id="target_language" class="form-control">
+                        <option value="en">Inglês</option>
+                        <option value="pt">Português</option>
+                        <option value="es">Espanhol</option>
+                        <option value="fr">Francês</option>
+                        <option value="de">Alemão</option>
+                        <option value="it">Italiano</option>
+                        <option value="ja">Japonês</option>
+                        <option value="zh">Chinês</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Idioma de origem (auto-detect se vazio)</label>
+                    <select id="source_language" class="form-control">
+                        <option value="">Auto-detectar</option>
+                        <option value="en">Inglês</option>
+                        <option value="pt">Português</option>
+                        <option value="es">Espanhol</option>
+                        <option value="fr">Francês</option>
+                        <option value="de">Alemão</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">✨ Funcionalidades</h3>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Identificação de Falantes</div>
+                        <div class="toggle-description">Identifica quem está falando usando Pyannote.audio</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="enable_speaker_id">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Sugestões Inteligentes</div>
+                        <div class="toggle-description">Gera sugestões de resposta usando LLM</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="enable_suggestions">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Análise de Sentimento</div>
+                        <div class="toggle-description">Analisa emoções e sentimentos nas conversas</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="enable_sentiment">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Monitor de Latência</div>
+                        <div class="toggle-description">Mostra métricas de performance em tempo real</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="show_latency_monitor">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: IA & Modelos -->
+        <div id="tab-ai" class="tab-content">
+            <div class="section">
+                <h3 class="section-title">🎯 Modo de Processamento</h3>
+                <p class="section-description">Escolha entre processamento local (gratuito) ou APIs externas (pago)</p>
+
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="mode_local" name="processing_mode" value="local">
+                        <label for="mode_local">
+                            <div class="radio-title">💻 Local <span class="badge">GRATUITO</span></div>
+                            <div class="radio-description">Whisper v3-turbo, Pyannote, Llama local</div>
+                        </label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="mode_fast" name="processing_mode" value="api_fast">
+                        <label for="mode_fast">
+                            <div class="radio-title">⚡ API Fast</div>
+                            <div class="radio-description">Deepgram, ElevenLabs, GPT-3.5</div>
+                        </label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="mode_premium" name="processing_mode" value="api_premium">
+                        <label for="mode_premium">
+                            <div class="radio-title">🏆 API Premium</div>
+                            <div class="radio-description">Deepgram Nova-2, GPT-4, qualidade máxima</div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">🎤 Modelo Whisper (Local)</h3>
+                <div class="form-group">
+                    <label class="form-label">Modelo STT</label>
+                    <select id="whisper_model" class="form-control">
+                        <option value="tiny">Tiny (~40MB, rápido)</option>
+                        <option value="base">Base (~150MB, balanceado)</option>
+                        <option value="small">Small (~500MB, bom)</option>
+                        <option value="medium">Medium (~1.5GB, muito bom)</option>
+                        <option value="large-v3">Large v3 (~3GB, melhor) ⭐</option>
+                    </select>
+                </div>
+
+                <div class="alert alert-info">
+                    ℹ️ Modelos maiores oferecem melhor qualidade mas exigem mais recursos e tempo de processamento.
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">⚙️ Prioridade de Performance</h3>
+                <div class="form-group">
+                    <select id="latency_priority" class="form-control">
+                        <option value="realtime">Tempo Real (latência mínima)</option>
+                        <option value="balanced">Balanceado (qualidade/velocidade)</option>
+                        <option value="quality">Qualidade (precisão máxima)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">🔑 API Keys</h3>
+                <p class="section-description">Configure suas chaves de API para usar serviços externos</p>
+
+                <div class="form-group">
+                    <label class="form-label">OpenAI API Key <span class="badge">GPT-4</span></label>
+                    <input type="password" id="openai_api_key" class="form-control" placeholder="sk-...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Deepgram API Key <span class="badge">STT</span></label>
+                    <input type="password" id="deepgram_api_key" class="form-control" placeholder="...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">DeepL API Key <span class="badge">Translation</span></label>
+                    <input type="password" id="deepl_api_key" class="form-control" placeholder="...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">ElevenLabs API Key <span class="badge">TTS</span></label>
+                    <input type="password" id="elevenlabs_api_key" class="form-control" placeholder="...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">HuggingFace Token <span class="badge">Pyannote</span></label>
+                    <input type="password" id="huggingface_token" class="form-control" placeholder="hf_...">
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Áudio -->
+        <div id="tab-audio" class="tab-content">
+            <div class="section">
+                <h3 class="section-title">🎚️ Configurações de Áudio</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Sample Rate (Hz)</label>
+                    <select id="sample_rate" class="form-control">
+                        <option value="8000">8000 Hz (telefone)</option>
+                        <option value="16000">16000 Hz (padrão)</option>
+                        <option value="44100">44100 Hz (CD quality)</option>
+                        <option value="48000">48000 Hz (profissional)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Chunk Size (samples)</label>
+                    <input type="number" id="chunk_size" class="form-control" value="1024" min="256" max="4096" step="256">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Canais</label>
+                    <select id="channels" class="form-control">
+                        <option value="1">Mono (1 canal)</option>
+                        <option value="2">Stereo (2 canais)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">🎧 Captura de Áudio</h3>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Capturar Microfone</div>
+                        <div class="toggle-description">Captura sua voz do microfone</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="capture_microphone" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Capturar Áudio do Sistema</div>
+                        <div class="toggle-description">Captura áudio de outros participantes (Teams/Meet/Zoom)</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="capture_system_audio" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Mixar Streams</div>
+                        <div class="toggle-description">Combina microfone + sistema em um único stream</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="mix_streams" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Teams -->
+        <div id="tab-teams" class="tab-content">
+            <div class="section">
+                <h3 class="section-title">🔍 Detecção Automática</h3>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Auto-detectar Reuniões do Teams</div>
+                        <div class="toggle-description">Detecta automaticamente quando você entra em uma reunião</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="teams_auto_detect" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Iniciar Captura Automaticamente</div>
+                        <div class="toggle-description">Inicia a gravação assim que detecta uma reunião</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="teams_auto_start">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Capturar Nomes de Participantes</div>
+                        <div class="toggle-description">Extrai automaticamente nomes dos participantes</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="teams_extract_names" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">🎨 Overlay</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Opacidade do Overlay (%)</label>
+                    <input type="range" id="overlay_opacity" class="form-control" min="50" max="100" value="95">
+                    <div style="text-align: center; margin-top: 8px; color: #718096;">
+                        <span id="overlay_opacity_value">95</span>%
+                    </div>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Sempre no Topo</div>
+                        <div class="toggle-description">Mantém o overlay sempre visível</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="overlay_always_on_top" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Invisível ao Screen Share</div>
+                        <div class="toggle-description">Não aparece em compartilhamentos de tela</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="overlay_invisible_to_capture" checked disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Atalhos -->
+        <div id="tab-shortcuts" class="tab-content">
+            <div class="section">
+                <h3 class="section-title">⌨️ Atalhos de Teclado</h3>
+                <p class="section-description">Atalhos globais para controlar o Salvavidas</p>
+
+                <div class="shortcut-list">
+                    <div class="shortcut-item">
+                        <span>Alternar Overlay</span>
+                        <span class="shortcut-key">Ctrl+Shift+O</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Modo Invisível</span>
+                        <span class="shortcut-key">Ctrl+Shift+I</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Esconder Tudo</span>
+                        <span class="shortcut-key">Ctrl+Shift+H</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Iniciar/Parar Captura</span>
+                        <span class="shortcut-key">Ctrl+Shift+R</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Abrir Configurações</span>
+                        <span class="shortcut-key">Ctrl+,</span>
+                    </div>
+                </div>
+
+                <div class="alert alert-info" style="margin-top: 20px;">
+                    ℹ️ Os atalhos funcionam mesmo quando o Salvavidas está em segundo plano.
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Avançado -->
+        <div id="tab-advanced" class="tab-content">
+            <div class="section">
+                <h3 class="section-title">🚀 Performance</h3>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Usar GPU Intel</div>
+                        <div class="toggle-description">Acelera processamento com GPU Intel (requer drivers)</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="use_intel_gpu">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Iniciar com o Sistema</div>
+                        <div class="toggle-description">Abre o Salvavidas automaticamente ao ligar o computador</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="auto_launch">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <div>
+                        <div class="toggle-label">Minimizar para System Tray</div>
+                        <div class="toggle-description">Ao fechar, mantém rodando em segundo plano</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="minimize_to_tray" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">🔧 Servidor Backend</h3>
+
+                <div class="form-group">
+                    <label class="form-label">URL do Servidor</label>
+                    <input type="text" id="backend_url" class="form-control" value="ws://localhost:8000" placeholder="ws://localhost:8000">
+                </div>
+
+                <div class="alert alert-warning">
+                    ⚠️ Altere apenas se estiver usando um servidor remoto ou porta personalizada.
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title">🗑️ Dados</h3>
+
+                <button class="btn btn-secondary" onclick="clearCache()">
+                    Limpar Cache
+                </button>
+                <button class="btn btn-secondary" onclick="clearSpeakers()">
+                    Remover Todos os Falantes
+                </button>
+                <button class="btn btn-danger" onclick="resetSettings()">
+                    Resetar para Padrões
+                </button>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="window.close()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveSettings()">Salvar Configurações</button>
+        </div>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+</html>

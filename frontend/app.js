@@ -30,13 +30,30 @@ async function loadConfig() {
         const response = await fetch('/api/config');
         const config = await response.json();
 
-        // Populate form
-        document.getElementById('processing_mode').value = config.processing_mode || 'local';
+        // Populate form - General
         document.getElementById('target_language').value = config.target_language || 'en';
-        document.getElementById('latency_priority').value = config.latency_priority || 'realtime';
+        document.getElementById('source_language').value = config.source_language || '';
         document.getElementById('enable_speaker_id').checked = config.enable_speaker_id !== false;
         document.getElementById('enable_suggestions').checked = config.enable_suggestions !== false;
+        document.getElementById('enable_sentiment').checked = config.enable_sentiment !== false;
+        document.getElementById('show_latency_monitor').checked = config.show_latency_monitor !== false;
+
+        // AI & Models
+        document.getElementById('processing_mode').value = config.processing_mode || 'local';
+        document.getElementById('whisper_model').value = config.whisper_model || 'large-v3';
+        document.getElementById('latency_priority').value = config.latency_priority || 'realtime';
         document.getElementById('use_intel_gpu').checked = config.use_intel_gpu === true;
+
+        // API Keys (optional)
+        if (config.openai_api_key) document.getElementById('openai_api_key').value = config.openai_api_key;
+        if (config.deepgram_api_key) document.getElementById('deepgram_api_key').value = config.deepgram_api_key;
+        if (config.deepl_api_key) document.getElementById('deepl_api_key').value = config.deepl_api_key;
+
+        // Show/hide latency monitor based on setting
+        const latencyMonitor = document.getElementById('latency-monitor');
+        if (latencyMonitor) {
+            latencyMonitor.style.display = config.show_latency_monitor !== false ? 'block' : 'none';
+        }
     } catch (error) {
         console.error('Error loading config:', error);
     }
@@ -45,12 +62,24 @@ async function loadConfig() {
 // Save configuration
 async function saveConfig() {
     const configs = {
-        processing_mode: document.getElementById('processing_mode').value,
+        // General
         target_language: document.getElementById('target_language').value,
-        latency_priority: document.getElementById('latency_priority').value,
+        source_language: document.getElementById('source_language').value,
         enable_speaker_id: document.getElementById('enable_speaker_id').checked,
         enable_suggestions: document.getElementById('enable_suggestions').checked,
+        enable_sentiment: document.getElementById('enable_sentiment').checked,
+        show_latency_monitor: document.getElementById('show_latency_monitor').checked,
+
+        // AI & Models
+        processing_mode: document.getElementById('processing_mode').value,
+        whisper_model: document.getElementById('whisper_model').value,
+        latency_priority: document.getElementById('latency_priority').value,
         use_intel_gpu: document.getElementById('use_intel_gpu').checked,
+
+        // API Keys (only save if not empty)
+        openai_api_key: document.getElementById('openai_api_key').value || '',
+        deepgram_api_key: document.getElementById('deepgram_api_key').value || '',
+        deepl_api_key: document.getElementById('deepl_api_key').value || '',
     };
 
     for (const [key, value] of Object.entries(configs)) {
@@ -67,7 +96,13 @@ async function saveConfig() {
         }
     }
 
-    alert('Configuration saved! Reconnecting...');
+    // Show/hide latency monitor immediately
+    const latencyMonitor = document.getElementById('latency-monitor');
+    if (latencyMonitor) {
+        latencyMonitor.style.display = configs.show_latency_monitor ? 'block' : 'none';
+    }
+
+    alert('✅ Configuration saved! Reconnecting...');
     connectWebSocket();
 }
 
@@ -95,6 +130,38 @@ async function loadSpeakers() {
         `).join('');
     } catch (error) {
         console.error('Error loading speakers:', error);
+    }
+}
+
+// Clear all speakers
+async function clearAllSpeakers() {
+    const confirmed = confirm(
+        'Are you sure you want to remove ALL speakers?\n\n' +
+        'This will delete all voice profiles and associated names.\n\n' +
+        'This action cannot be undone.'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/speakers/clear', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.ok) {
+            alert('✅ All speakers have been removed successfully!');
+            await loadSpeakers(); // Reload the speakers list
+        } else {
+            alert('❌ Error clearing speakers. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error clearing speakers:', error);
+        alert('❌ Error clearing speakers: ' + error.message);
     }
 }
 

@@ -8,7 +8,12 @@ let backendUrlInput;
 let modeSelect;
 let processingModeSelect;
 let languageSelect;
+let sourceLanguageSelect;
 let autoStartCheckbox;
+let enableSpeakerIdCheckbox;
+let enableSuggestionsCheckbox;
+let enableSentimentCheckbox;
+let showLatencyCheckbox;
 let btnSave;
 let btnTest;
 let btnStart;
@@ -24,8 +29,13 @@ let currentSettings = {
   settings: {
     autoStart: false,
     language: 'en',
+    sourceLanguage: '',
     mode: 'meeting_assistant',
-    processingMode: 'local'
+    processingMode: 'local',
+    enableSpeakerId: true,
+    enableSuggestions: true,
+    enableSentiment: true,
+    showLatency: true
   }
 };
 
@@ -40,7 +50,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   modeSelect = document.getElementById('mode');
   processingModeSelect = document.getElementById('processing-mode');
   languageSelect = document.getElementById('language');
+  sourceLanguageSelect = document.getElementById('source-language');
   autoStartCheckbox = document.getElementById('auto-start');
+  enableSpeakerIdCheckbox = document.getElementById('enable-speaker-id');
+  enableSuggestionsCheckbox = document.getElementById('enable-suggestions');
+  enableSentimentCheckbox = document.getElementById('enable-sentiment');
+  showLatencyCheckbox = document.getElementById('show-latency');
   btnSave = document.getElementById('btn-save');
   btnTest = document.getElementById('btn-test');
   btnStart = document.getElementById('btn-start');
@@ -84,7 +99,12 @@ async function loadSettings() {
       modeSelect.value = currentSettings.settings.mode;
       processingModeSelect.value = currentSettings.settings.processingMode;
       languageSelect.value = currentSettings.settings.language;
+      sourceLanguageSelect.value = currentSettings.settings.sourceLanguage || '';
       autoStartCheckbox.checked = currentSettings.settings.autoStart;
+      enableSpeakerIdCheckbox.checked = currentSettings.settings.enableSpeakerId !== false;
+      enableSuggestionsCheckbox.checked = currentSettings.settings.enableSuggestions !== false;
+      enableSentimentCheckbox.checked = currentSettings.settings.enableSentiment !== false;
+      showLatencyCheckbox.checked = currentSettings.settings.showLatency !== false;
 
       console.log('[Salvavidas Popup] Settings loaded:', currentSettings);
     }
@@ -105,7 +125,12 @@ async function saveSettings() {
       mode: modeSelect.value,
       processingMode: processingModeSelect.value,
       language: languageSelect.value,
-      autoStart: autoStartCheckbox.checked
+      sourceLanguage: sourceLanguageSelect.value,
+      autoStart: autoStartCheckbox.checked,
+      enableSpeakerId: enableSpeakerIdCheckbox.checked,
+      enableSuggestions: enableSuggestionsCheckbox.checked,
+      enableSentiment: enableSentimentCheckbox.checked,
+      showLatency: showLatencyCheckbox.checked
     };
 
     // Validate backend URL
