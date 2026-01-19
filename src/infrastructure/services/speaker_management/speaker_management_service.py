@@ -398,6 +398,35 @@ class SpeakerManagementService(ISpeakerManagementService):
         speaker.last_seen = datetime.now()
         speaker.updated_at = datetime.now()
 
+    async def update_speaker_name(
+        self,
+        speaker_id: str,
+        name: str,
+        email: Optional[str] = None
+    ) -> bool:
+        """
+        Update the name and email of an enrolled speaker.
+
+        Args:
+            speaker_id: Unique speaker identifier
+            name: New name for the speaker
+            email: Optional email address
+
+        Returns:
+            True if successful, False if speaker not found
+        """
+        if speaker_id not in self.enrolled_speakers:
+            return False
+
+        speaker = self.enrolled_speakers[speaker_id]
+        speaker.name = name
+        if email:
+            speaker.email = email
+        speaker.updated_at = datetime.now()
+
+        print(f"[SpeakerMgmt] Updated speaker {speaker_id}: name='{name}', email='{email}'")
+        return True
+
     # Helper methods
 
     def _generate_voice_embedding(self, audio_samples: List[bytes]) -> np.ndarray:

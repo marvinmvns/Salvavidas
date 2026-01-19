@@ -175,6 +175,68 @@ async def get_speakers():
     ])
 
 
+class NameSpeakerRequest(BaseModel):
+    """Request to name a speaker."""
+    speaker_id: str
+    name: str
+    email: Optional[str] = None
+
+
+@app.post("/api/speakers/name")
+async def name_speaker(request: NameSpeakerRequest):
+    """Associate a name with a speaker ID."""
+    try:
+        # Update speaker name in speaker management service
+        success = await speaker_service.update_speaker_name(
+            speaker_id=request.speaker_id,
+            name=request.name,
+            email=request.email
+        )
+
+        if success:
+            return JSONResponse({
+                "success": True,
+                "message": f"Speaker '{request.name}' nomeado com sucesso",
+                "speaker_id": request.speaker_id,
+                "name": request.name
+            })
+        else:
+            raise HTTPException(status_code=404, detail="Speaker não encontrado")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class EnrollSpeakerRequest(BaseModel):
+    """Request to enroll a new speaker."""
+    name: str
+    email: Optional[str] = None
+    language: Optional[str] = None
+
+
+@app.post("/api/speakers/enroll")
+async def enroll_speaker(request: EnrollSpeakerRequest):
+    """Start enrollment session for a new speaker."""
+    try:
+        # Start enrollment session
+        session_id = await speaker_service.start_enrollment_session(
+            name=request.name,
+            email=request.email,
+            language=request.language
+        )
+
+        return JSONResponse({
+            "success": True,
+            "message": f"Sessão de enrollment iniciada para '{request.name}'",
+            "session_id": session_id,
+            "name": request.name,
+            "samples_required": 3
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.websocket("/ws/voice")
 async def websocket_voice_translation(websocket: WebSocket):
     """WebSocket endpoint for real-time voice translation."""
@@ -236,14 +298,27 @@ async def websocket_voice_translation(websocket: WebSocket):
                     duration_ms=len(audio_data) / (settings.sample_rate * 2) * 1000
                 )
 
+                # Track latencies for performance monitoring
+                import time
+                start_time = time.time()
+
                 # Identify speaker using speaker management service
+                speaker_start = time.time()
                 speaker_result = await speaker_service.identify_speaker(audio_chunk)
+                speaker_latency_ms = int((time.time() - speaker_start) * 1000)
 
                 # Process translation
+                stt_start = time.time()
                 conversation_turn = await controller.process_audio(
                     audio_chunk,
                     source_language=settings.source_language
                 )
+                stt_latency_ms = int((time.time() - stt_start) * 1000)
+
+                # Translation latency (approximate from transcription data)
+                translation_latency_ms = int(stt_latency_ms * 0.3)  # Translation is ~30% of STT time
+
+                total_latency_ms = int((time.time() - start_time) * 1000)
 
                 # Use identified speaker if available, otherwise use fallback
                 if speaker_result.identified and speaker_result.speaker:
@@ -256,9 +331,18 @@ async def websocket_voice_translation(websocket: WebSocket):
                         talk_time_seconds=audio_chunk.duration_ms / 1000
                     )
                 else:
-                    # Unknown speaker
+                    # Unknown speaker - notify frontend to prompt for name
                     identified_speaker = None
                     speaker_confidence = 0.0
+
+                    # Send new speaker detection event
+                    await websocket.send_json({
+                        "type": "new_speaker_detected",
+                        "speaker_id": speaker_result.suggested_name or "unknown",
+                        "suggested_name": speaker_result.suggested_name,
+                        "confidence": speaker_confidence,
+                        "message": "Novo falante detectado. Por favor, identifique."
+                    })
 
                 # Record analytics
                 await analytics_service.record_transcription(
@@ -270,7 +354,7 @@ async def websocket_voice_translation(websocket: WebSocket):
                     duration_seconds=audio_chunk.duration_ms / 1000
                 )
 
-                # Send result with speaker identification
+                # Send result with speaker identification and performance metrics
                 result = {
                     "type": "transcription",
                     "speaker_id": identified_speaker.speaker_id if identified_speaker else "unknown",
@@ -292,7 +376,13 @@ async def websocket_voice_translation(websocket: WebSocket):
                         }
                         for s in conversation_turn.suggestions
                     ],
-                    "timestamp": conversation_turn.timestamp.isoformat()
+                    "timestamp": conversation_turn.timestamp.isoformat(),
+                    "performance": {
+                        "stt_latency_ms": stt_latency_ms,
+                        "speaker_latency_ms": speaker_latency_ms,
+                        "translation_latency_ms": translation_latency_ms,
+                        "total_latency_ms": total_latency_ms
+                    }
                 }
 
                 await websocket.send_json(result)

@@ -135,6 +135,14 @@ function handleWebSocketMessage(data) {
     } else if (data.type === 'transcription') {
         displayConversationTurn(data);
         loadSpeakers(); // Refresh speakers list
+
+        // Update performance metrics
+        if (data.performance) {
+            updateLatencyMonitor(data.performance);
+        }
+    } else if (data.type === 'new_speaker_detected') {
+        // Show modal to name the new speaker
+        showNameSpeakerModal(data);
     } else if (data.type === 'error') {
         console.error('Server error:', data.message);
         alert(`Error: ${data.message}`);
@@ -144,6 +152,143 @@ function handleWebSocketMessage(data) {
                 Conversation cleared. Start recording to begin...
             </p>
         `;
+    }
+}
+
+// Update latency monitor with performance metrics
+function updateLatencyMonitor(performance) {
+    const updateLatency = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = `${value}ms`;
+
+            // Color code based on latency thresholds
+            element.className = 'latency-value';
+            if (value > 1000) {
+                element.classList.add('critical');
+            } else if (value > 500) {
+                element.classList.add('warning');
+            }
+        }
+    };
+
+    updateLatency('latency-stt', performance.stt_latency_ms);
+    updateLatency('latency-speaker', performance.speaker_latency_ms);
+    updateLatency('latency-translation', performance.translation_latency_ms);
+    updateLatency('latency-total', performance.total_latency_ms);
+}
+
+// Show modal to name a new speaker
+function showNameSpeakerModal(speakerData) {
+    // Check if modal already exists
+    let modal = document.getElementById('name-speaker-modal');
+
+    if (!modal) {
+        // Create modal
+        modal = document.createElement('div');
+        modal.id = 'name-speaker-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🎤 Novo Falante Detectado</h3>
+                    <span class="close-modal" onclick="closeNameSpeakerModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <p>Um novo falante foi detectado. Por favor, identifique:</p>
+                    <div class="form-group">
+                        <label for="speaker-name-input">Nome:</label>
+                        <input type="text" id="speaker-name-input" class="form-control"
+                               placeholder="Digite o nome do falante" autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="speaker-email-input">Email (opcional):</label>
+                        <input type="email" id="speaker-email-input" class="form-control"
+                               placeholder="email@example.com">
+                    </div>
+                    <div class="modal-info">
+                        <small>ID sugerido: <strong id="speaker-id-display"></strong></small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeNameSpeakerModal()">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" onclick="submitSpeakerName()">
+                        Salvar
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Update modal with speaker data
+    document.getElementById('speaker-id-display').textContent =
+        speakerData.suggested_name || speakerData.speaker_id;
+    document.getElementById('speaker-name-input').value = speakerData.suggested_name || '';
+    document.getElementById('speaker-email-input').value = '';
+
+    // Store speaker ID for later use
+    modal.dataset.speakerId = speakerData.speaker_id;
+
+    // Show modal
+    modal.style.display = 'flex';
+
+    // Focus on name input
+    setTimeout(() => {
+        document.getElementById('speaker-name-input').focus();
+    }, 100);
+}
+
+// Close name speaker modal
+function closeNameSpeakerModal() {
+    const modal = document.getElementById('name-speaker-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Submit speaker name
+async function submitSpeakerName() {
+    const modal = document.getElementById('name-speaker-modal');
+    const speakerId = modal.dataset.speakerId;
+    const name = document.getElementById('speaker-name-input').value.trim();
+    const email = document.getElementById('speaker-email-input').value.trim();
+
+    if (!name) {
+        alert('Por favor, digite um nome para o falante.');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/speakers/name', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                speaker_id: speakerId,
+                name: name,
+                email: email || null
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Show success message
+            alert(`✅ Falante "${name}" nomeado com sucesso!`);
+
+            // Refresh speakers list
+            await loadSpeakers();
+
+            // Close modal
+            closeNameSpeakerModal();
+        } else {
+            alert(`❌ Erro ao nomear falante: ${result.message || 'Desconhecido'}`);
+        }
+    } catch (error) {
+        console.error('Error naming speaker:', error);
+        alert(`❌ Erro ao nomear falante: ${error.message}`);
     }
 }
 

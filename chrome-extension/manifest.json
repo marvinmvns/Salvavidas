@@ -23,7 +23,7 @@
         "https://*.zoom.us/*",
         "https://teams.microsoft.com/*"
       ],
-      "js": ["content/content.js"],
+      "js": ["content/participants-extractor.js", "content/content.js"],
       "css": ["content/overlay.css"],
       "run_at": "document_end"
     }

@@ -290,6 +290,171 @@
             font-size: 1.2rem;
             margin-right: 8px;
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 500px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+            color: #2d3748;
+        }
+
+        .close-modal {
+            font-size: 2rem;
+            font-weight: 300;
+            color: #718096;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-info {
+            padding: 12px;
+            background-color: #f7fafc;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .modal-footer {
+            padding: 20px 25px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            padding: 10px 20px;
+            border: 1px solid #cbd5e0;
+            background-color: white;
+            color: #4a5568;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background-color: #f7fafc;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            border: none;
+            background-color: #667eea;
+            color: white;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background-color: #5a67d8;
+        }
+
+        /* Latency Monitor */
+        .latency-monitor {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            min-width: 220px;
+        }
+
+        .latency-monitor-title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #667eea;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 4px;
+        }
+
+        .latency-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+        }
+
+        .latency-label {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .latency-value {
+            font-weight: bold;
+            color: #48bb78;
+        }
+
+        .latency-value.warning {
+            color: #f6ad55;
+        }
+
+        .latency-value.critical {
+            color: #f56565;
+        }
     </style>
 </head>
 <body>
@@ -401,6 +566,27 @@
                     </p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Latency Monitor -->
+    <div class="latency-monitor" id="latency-monitor">
+        <div class="latency-monitor-title">⚡ Performance</div>
+        <div class="latency-item">
+            <span class="latency-label">STT:</span>
+            <span class="latency-value" id="latency-stt">--ms</span>
+        </div>
+        <div class="latency-item">
+            <span class="latency-label">Speaker ID:</span>
+            <span class="latency-value" id="latency-speaker">--ms</span>
+        </div>
+        <div class="latency-item">
+            <span class="latency-label">Translation:</span>
+            <span class="latency-value" id="latency-translation">--ms</span>
+        </div>
+        <div class="latency-item">
+            <span class="latency-label">Total:</span>
+            <span class="latency-value" id="latency-total">--ms</span>
         </div>
     </div>
 

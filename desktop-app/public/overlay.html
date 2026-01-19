@@ -248,6 +248,43 @@
         .status-dot.disconnected {
             background: #f56565;
         }
+
+        /* Latency Monitor */
+        .latency-monitor {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-family: 'Courier New', monospace;
+            -webkit-app-region: no-drag;
+        }
+
+        .latency-title {
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+        }
+
+        .latency-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .latency-value {
+            font-weight: bold;
+            color: #48bb78;
+        }
+
+        .latency-value.warning {
+            color: #f6ad55;
+        }
+
+        .latency-value.critical {
+            color: #f56565;
+        }
     </style>
 </head>
 <body>
@@ -289,6 +326,22 @@
 
         <div id="suggestions-container">
             <!-- Suggestions will be added here dynamically -->
+        </div>
+
+        <div class="latency-monitor">
+            <div class="latency-title">⚡ Performance</div>
+            <div class="latency-item">
+                <span>STT:</span>
+                <span class="latency-value" id="lat-stt">--ms</span>
+            </div>
+            <div class="latency-item">
+                <span>Speaker:</span>
+                <span class="latency-value" id="lat-speaker">--ms</span>
+            </div>
+            <div class="latency-item">
+                <span>Total:</span>
+                <span class="latency-value" id="lat-total">--ms</span>
+            </div>
         </div>
 
         <div class="shortcuts-hint">
@@ -398,7 +451,28 @@
                 if (data.suggestions && data.suggestions.length > 0) {
                     displaySuggestions(data.suggestions);
                 }
+
+                // Update performance metrics
+                if (data.performance) {
+                    updateLatencies(data.performance);
+                }
             }
+        }
+
+        function updateLatencies(perf) {
+            const update = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.textContent = `${value}ms`;
+                    el.className = 'latency-value';
+                    if (value > 1000) el.classList.add('critical');
+                    else if (value > 500) el.classList.add('warning');
+                }
+            };
+
+            update('lat-stt', perf.stt_latency_ms);
+            update('lat-speaker', perf.speaker_latency_ms);
+            update('lat-total', perf.total_latency_ms);
         }
 
         function displaySuggestions(suggestions) {
