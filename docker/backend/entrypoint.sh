@@ -7,6 +7,9 @@ echo "========================================="
 echo ""
 
 # Check if models should be downloaded
+echo "🔧 Applying compatibility patches..."
+python3 /app/patch_speechbrain.py || echo "⚠️ Patch script failed or missing"
+
 if [ "$PROCESSING_MODE" = "local" ] && [ "$SKIP_MODEL_DOWNLOAD" != "true" ]; then
     echo "🔍 Checking for required models..."
     python3 /app/download-models.py

@@ -1,80 +1,73 @@
-# Core dependencies
-python-dotenv==1.0.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# --- Core & Utils ---
+python-dotenv>=1.0.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+numpy>=1.26.3
+scipy>=1.11.4
 
-# Audio processing
-pyaudio==0.2.14
-numpy==1.26.3
-scipy==1.11.4
-librosa==0.10.1
+# --- Audio & STT (Modern Versions for Python 3.12) ---
+# Using standard PyTorch (Intel/CPU optimized will be installed via extra-index-url if needed, but standard works)
+torch>=2.5.1
+torchaudio>=2.5.1
 
-# Local STT (Speech-to-Text)
-faster-whisper==0.10.0
-torch==2.1.2
-torchaudio==2.1.2
+# Faster Whisper 1.0+ supports Python 3.11/3.12 and newer av versions
+faster-whisper>=1.0.3
+librosa>=0.10.1
 
-# Local Speaker Identification & Management
-pyannote.audio==3.1.1  # Production speaker embeddings for enrollment & identification
-speechbrain==0.5.16
+# --- TTS ---
+gTTS>=2.5.0
+pyttsx3>=2.98
 
-# Local Translation
-transformers==4.36.2
-sentencepiece==0.1.99
+# --- LLM & Translation ---
+transformers>=4.37.0
+ctranslate2>=4.0.0
+tokenizers>=0.15.0
+huggingface-hub>=0.20.0
+sentencepiece>=0.1.99
 
-# Local LLM
-llama-cpp-python==0.2.27
+# --- API Clients ---
+openai>=1.10.0
+anthropic>=0.15.0
+deepgram-sdk>=3.2.0
+assemblyai>=0.23.0
+deepl>=1.16.0
+elevenlabs>=0.2.27
+google-cloud-speech>=2.23.0
+google-cloud-texttospeech>=2.14.0
+azure-cognitiveservices-speech>=1.34.0
+boto3>=1.34.0
 
-# Local TTS
-piper-tts==1.2.0
+# --- Web & API ---
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+websockets>=12.0
+aiohttp>=3.9.1
+aiofiles>=23.2.1
 
-# API clients - STT
-deepgram-sdk==3.2.2
-assemblyai==0.23.0
+# --- Database ---
+sqlalchemy>=2.0.25
+aiosqlite>=0.19.0
 
-# API clients - Translation
-deepl==1.16.1
+# --- Speaker ID (Optional/Advanced) ---
+# pyannote.audio 3.1.1 is strictly pinned usually, try newer if available or keep pin but handle dependencies
+pyannote.audio>=3.1.1
+speechbrain>=1.0.0
 
-# API clients - LLM
-openai==1.7.2
-anthropic==0.8.1
+# --- LLM Runtime ---
+llama-cpp-python>=0.2.77
 
-# API clients - TTS
-elevenlabs==0.2.27
+# --- Intel Optimization ---
+intel-extension-for-pytorch>=2.5.0
+openvino>=2025.0.0
 
-# API clients - Cloud services
-google-cloud-speech==2.23.0
-google-cloud-texttospeech==2.14.2
-azure-cognitiveservices-speech==1.34.1
-boto3==1.34.23
+# --- Utils ---
+langdetect>=1.0.9
+requests>=2.31.0
+python-multipart>=0.0.9
 
-# Web framework
-fastapi==0.109.0
-uvicorn[standard]==0.25.0
-
-# Web streaming
-websockets==12.0
-aiohttp==3.9.1
-aiofiles==23.2.1
-
-# Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-pytest-mock==3.12.0
-
-# Language detection
-langdetect==1.0.9
-
-# Database
-sqlalchemy==2.0.25
-aiosqlite==0.19.0
-
-# Intel GPU optimization (optional)
-intel-extension-for-pytorch==2.1.30
-openvino==2023.2.0
-
-# Development
-black==23.12.1
-flake8==7.0.0
-mypy==1.8.0
+# --- Dev Tools ---
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+black>=24.1.0
+flake8>=7.0.0
+mypy>=1.8.0

@@ -16,6 +16,12 @@ from .meeting import (
     ObjectionContext,
     MeetingStats,
 )
+from .speaker_management import (
+    SpeakerIdentificationResult,
+    EnrolledSpeaker,
+    SpeakerEnrollmentSession,
+    EnrollmentStatus,
+)
 
 __all__ = [
     "AudioChunk",
@@ -32,4 +38,8 @@ __all__ = [
     "MeetingContext",
     "ObjectionContext",
     "MeetingStats",
+    "SpeakerIdentificationResult",
+    "EnrolledSpeaker",
+    "SpeakerEnrollmentSession",
+    "EnrollmentStatus",
 ]

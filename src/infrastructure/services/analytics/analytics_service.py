@@ -71,7 +71,7 @@ class AnalyticsService(IAnalyticsService):
             "translations": 0,
             "suggestions": [],
             "sentiments": [],
-            "languages": set(),
+            "languages": [],
             "speaker_talk_time": defaultdict(int),
         }
 
@@ -105,7 +105,12 @@ class AnalyticsService(IAnalyticsService):
         negative_moments = sum(1 for s in sentiments if s["score"] < -0.5)
 
         # Determine primary language
-        primary_lang = max(meeting_data["languages"], key=lambda l: meeting_data["languages"].count(l)) if meeting_data["languages"] else "unknown"
+        # Fix: languages is a list now to support counting
+        languages_list = list(meeting_data["languages"])
+        if languages_list:
+             primary_lang = max(set(languages_list), key=languages_list.count)
+        else:
+             primary_lang = "unknown"
 
         analytics = MeetingAnalytics(
             meeting_id=meeting_id,
@@ -151,14 +156,14 @@ class AnalyticsService(IAnalyticsService):
         meeting["transcriptions"].append(transcription.text)
 
         if speaker:
-            meeting["speakers"].add(speaker.id)
+            meeting["speakers"].add(speaker.speaker_id)
             # Estimate talk time (rough approximation: 150 words per minute)
             word_count = len(transcription.text.split())
             talk_time_seconds = int((word_count / 150) * 60)
-            meeting["speaker_talk_time"][speaker.id] += talk_time_seconds
+            meeting["speaker_talk_time"][speaker.speaker_id] += talk_time_seconds
 
             # Update speaker global data
-            speaker_info = self.speaker_data[speaker.id]
+            speaker_info = self.speaker_data[speaker.speaker_id]
             speaker_info["meetings"].add(meeting_id)
             speaker_info["talk_time"] += talk_time_seconds
             speaker_info["last_seen"] = datetime.now()
@@ -167,7 +172,7 @@ class AnalyticsService(IAnalyticsService):
 
         # Detect language (simplified - would use actual detection)
         if transcription.language:
-            meeting["languages"].add(transcription.language)
+            meeting["languages"].append(transcription.language)
 
     async def record_sentiment(
         self,
@@ -195,13 +200,13 @@ class AnalyticsService(IAnalyticsService):
             sentiment_score=sentiment_data["score"],
             confidence=sentiment.confidence,
             text_snippet=sentiment.text_analyzed[:100] if len(sentiment.text_analyzed) > 100 else sentiment.text_analyzed,
-            speaker_id=speaker.id if speaker else None,
+            speaker_id=speaker.speaker_id if speaker else None,
         )
         self.sentiment_history[meeting_id].append(trend)
 
         # Update speaker sentiment data
         if speaker:
-            self.speaker_data[speaker.id]["sentiments"].append(sentiment_data["score"])
+            self.speaker_data[speaker.speaker_id]["sentiments"].append(sentiment_data["score"])
 
     async def record_suggestion(
         self,

@@ -1,665 +1,218 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salvavidas - Voice Translation</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 20px;
-        }
-
-        .sidebar {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            max-height: calc(100vh - 200px);
-            overflow-y: auto;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-rows: auto 1fr;
-            gap: 20px;
-        }
-
-        .control-panel {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .conversation-area {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        .config-section {
-            margin-bottom: 25px;
-        }
-
-        .config-section h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 5px;
-        }
-
-        .config-item {
-            margin-bottom: 15px;
-        }
-
-        .config-item label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .config-item select,
-        .config-item input {
-            width: 100%;
-            padding: 8px;
-            border: 2px solid #e0e0e0;
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-
-        .config-item select:focus,
-        .config-item input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-danger {
-            background: #f56565;
-            color: white;
-        }
-
-        .btn-success {
-            background: #48bb78;
-            color: white;
-        }
-
-        .btn-large {
-            width: 100%;
-            padding: 15px;
-            font-size: 1.1rem;
-            margin-top: 15px;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-
-        .status-indicator.connected {
-            background: #48bb78;
-            box-shadow: 0 0 10px #48bb78;
-        }
-
-        .status-indicator.disconnected {
-            background: #f56565;
-        }
-
-        .status-indicator.recording {
-            background: #ed8936;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        .message {
-            margin-bottom: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            background: #f7fafc;
-            border-left: 4px solid #667eea;
-        }
-
-        .message-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 0.9rem;
-        }
-
-        .speaker-info {
-            font-weight: 600;
-            color: #667eea;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .speaker-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .speaker-badge.enrolled {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #10b981;
-        }
-
-        .speaker-badge.new {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #f59e0b;
-        }
-
-        .timestamp {
-            color: #718096;
-        }
-
-        .message-content {
-            margin-bottom: 10px;
-        }
-
-        .original-text {
-            font-size: 1.1rem;
-            color: #2d3748;
-            margin-bottom: 8px;
-        }
-
-        .translated-text {
-            font-size: 1.1rem;
-            color: #4a5568;
-            font-style: italic;
-            padding: 10px;
-            background: #edf2f7;
-            border-radius: 5px;
-        }
-
-        .suggestions {
-            margin-top: 10px;
-        }
-
-        .suggestions-title {
-            font-size: 0.85rem;
-            color: #718096;
-            margin-bottom: 5px;
-        }
-
-        .suggestion-item {
-            display: inline-block;
-            margin: 3px;
-            padding: 6px 12px;
-            background: #e6f7ff;
-            border: 1px solid #91d5ff;
-            border-radius: 15px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .suggestion-item:hover {
-            background: #bae7ff;
-            transform: translateY(-2px);
-        }
-
-        .speakers-list {
-            margin-top: 15px;
-        }
-
-        .speaker-chip {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            background: #f0f4ff;
-            border-radius: 8px;
-            font-size: 0.9rem;
-        }
-
-        .speaker-flag {
-            font-size: 1.2rem;
-            margin-right: 8px;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            width: 90%;
-            max-width: 500px;
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .modal-header {
-            padding: 20px 25px;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            font-size: 1.3rem;
-            color: #2d3748;
-        }
-
-        .close-modal {
-            font-size: 2rem;
-            font-weight: 300;
-            color: #718096;
-            cursor: pointer;
-        }
-
-        .modal-body {
-            padding: 25px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #2d3748;
-            font-weight: 500;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #cbd5e0;
-            border-radius: 6px;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .modal-info {
-            padding: 12px;
-            background-color: #f7fafc;
-            border-radius: 6px;
-            margin-top: 15px;
-        }
-
-        .modal-footer {
-            padding: 20px 25px;
-            border-top: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .btn-secondary {
-            padding: 10px 20px;
-            border: 1px solid #cbd5e0;
-            background-color: white;
-            color: #4a5568;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .btn-secondary:hover {
-            background-color: #f7fafc;
-        }
-
-        .btn-primary {
-            padding: 10px 20px;
-            border: none;
-            background-color: #667eea;
-            color: white;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        .btn-primary:hover {
-            background-color: #5a67d8;
-        }
-
-        /* Latency Monitor */
-        .latency-monitor {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-family: 'Courier New', monospace;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 999;
-            min-width: 220px;
-        }
-
-        .latency-monitor-title {
-            font-weight: bold;
-            margin-bottom: 6px;
-            color: #667eea;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            padding-bottom: 4px;
-        }
-
-        .latency-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-        }
-
-        .latency-label {
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .latency-value {
-            font-weight: bold;
-            color: #48bb78;
-        }
-
-        .latency-value.warning {
-            color: #f6ad55;
-        }
-
-        .latency-value.critical {
-            color: #f56565;
-        }
-    </style>
+    <title>SalvaVidas Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts for that premium look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🚁 Salvavidas</h1>
-            <p>Real-time Voice Translation with Speaker Identification</p>
-        </div>
 
-        <div class="main-grid">
-            <!-- Sidebar: Configuration -->
-            <div class="sidebar">
-                <div class="config-section">
-                    <h3>🎛️ General Settings</h3>
+    <div class="app-container">
+        <!-- LEFT SIDEBAR: Navigation & Config -->
+        <div class="sidebar-left">
+            <div class="logo-header">
+                <div class="logo-icon"></div>
+                <div class="logo-text">Salvavidas</div>
+            </div>
 
-                    <div class="config-item">
-                        <label>Target Language</label>
-                        <select id="target_language">
-                            <option value="en">English</option>
-                            <option value="pt">Portuguese (Português)</option>
-                            <option value="es">Spanish (Español)</option>
-                            <option value="fr">French (Français)</option>
-                            <option value="de">German (Deutsch)</option>
-                            <option value="it">Italian (Italiano)</option>
-                            <option value="ja">Japanese (日本語)</option>
-                            <option value="zh">Chinese (中文)</option>
-                        </select>
+            <div class="nav-menu">
+                <div class="nav-section-title">System Status</div>
+
+                <div class="switch-container">
+                    <div>
+                        <div class="switch-label">Live Monitor</div>
+                        <div class="switch-sublabel" id="monitor-status">Inactive</div>
                     </div>
-
-                    <div class="config-item">
-                        <label>Source Language</label>
-                        <select id="source_language">
-                            <option value="">Auto-detect</option>
-                            <option value="en">English</option>
-                            <option value="pt">Portuguese</option>
-                            <option value="es">Spanish</option>
-                            <option value="fr">French</option>
-                            <option value="de">German</option>
-                            <option value="it">Italian</option>
-                            <option value="ja">Japanese</option>
-                            <option value="zh">Chinese</option>
-                        </select>
-                    </div>
-
-                    <div class="config-item">
-                        <label>
-                            <input type="checkbox" id="enable_speaker_id" checked>
-                            Enable Speaker Identification
-                        </label>
-                    </div>
-
-                    <div class="config-item">
-                        <label>
-                            <input type="checkbox" id="enable_suggestions" checked>
-                            Enable Response Suggestions
-                        </label>
-                    </div>
-
-                    <div class="config-item">
-                        <label>
-                            <input type="checkbox" id="enable_sentiment" checked>
-                            Enable Sentiment Analysis
-                        </label>
-                    </div>
-
-                    <div class="config-item">
-                        <label>
-                            <input type="checkbox" id="show_latency_monitor" checked>
-                            Show Performance Monitor
-                        </label>
-                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="system-toggle" onchange="toggleSystem(this)">
+                        <span class="slider"></span>
+                    </label>
                 </div>
 
-                <div class="config-section">
-                    <h3>🤖 AI & Models</h3>
+                <div class="nav-section-title">Configuration</div>
 
-                    <div class="config-item">
-                        <label>Processing Mode</label>
-                        <select id="processing_mode">
-                            <option value="local">Local (Free)</option>
-                            <option value="api_fast">API Fast ($$)</option>
-                            <option value="api_premium">API Premium ($$$)</option>
-                        </select>
-                    </div>
-
-                    <div class="config-item">
-                        <label>Whisper Model</label>
-                        <select id="whisper_model">
-                            <option value="large-v3">large-v3 (Best Quality)</option>
-                            <option value="medium">medium (Balanced)</option>
-                            <option value="small">small (Fast)</option>
-                            <option value="base">base (Fastest)</option>
-                        </select>
-                    </div>
-
-                    <div class="config-item">
-                        <label>Latency Priority</label>
-                        <select id="latency_priority">
-                            <option value="realtime">Realtime (Fastest)</option>
-                            <option value="balanced">Balanced</option>
-                            <option value="quality">Quality (Best)</option>
-                        </select>
-                    </div>
-
-                    <div class="config-item">
-                        <label>
-                            <input type="checkbox" id="use_intel_gpu">
-                            Use Intel GPU (Local Mode Only)
-                        </label>
-                    </div>
-
-                    <div class="config-item" style="margin-top: 15px;">
-                        <details>
-                            <summary style="cursor: pointer; font-weight: 600; color: #667eea;">
-                                🔑 API Keys (Optional)
-                            </summary>
-                            <div style="margin-top: 10px;">
-                                <div class="config-item">
-                                    <label style="font-size: 0.85rem;">OpenAI API Key</label>
-                                    <input type="password" id="openai_api_key" placeholder="sk-...">
-                                </div>
-                                <div class="config-item">
-                                    <label style="font-size: 0.85rem;">Deepgram API Key</label>
-                                    <input type="password" id="deepgram_api_key" placeholder="...">
-                                </div>
-                                <div class="config-item">
-                                    <label style="font-size: 0.85rem;">DeepL API Key</label>
-                                    <input type="password" id="deepl_api_key" placeholder="...">
-                                </div>
-                            </div>
-                        </details>
-                    </div>
+                <div class="config-item">
+                    <label>Target Language</label>
+                    <select id="target_language">
+                        <option value="en">English</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="ja">Japanese</option>
+                        <option value="zh">Chinese</option>
+                    </select>
                 </div>
 
-                <div style="margin-bottom: 20px;">
-                    <button class="btn btn-primary btn-large" onclick="saveConfig()">
-                        💾 Save Configuration
-                    </button>
+                <div class="config-item">
+                    <label>Microphone</label>
+                    <select id="audio_input_device">
+                        <option value="default">Default</option>
+                    </select>
                 </div>
 
-                <div class="config-section">
-                    <h3>👥 Known Speakers</h3>
-                    <div class="speakers-list" id="speakers-list">
-                        <p style="color: #718096; font-size: 0.9rem;">No speakers yet</p>
-                    </div>
-                    <button class="btn btn-danger" onclick="clearAllSpeakers()" style="width: 100%; margin-top: 10px;">
-                        🗑️ Clear All Speakers
+                <div class="config-item">
+                    <label>AI Model</label>
+                    <select id="whisper_model">
+                        <option value="large-v3">Large V3 (Best)</option>
+                        <option value="medium">Medium</option>
+                        <option value="base">Base (Fast)</option>
+                    </select>
+                </div>
+
+                <div class="config-item">
+                    <label>
+                        <input type="checkbox" id="enable_speaker_id" checked> Identify Speakers
+                    </label>
+                </div>
+
+                <div class="config-item">
+                    <label>
+                        <input type="checkbox" id="enable_suggestions" checked> AI Suggestions
+                    </label>
+                </div>
+
+                <div style="margin-top: auto;">
+                    <button class="btn btn-secondary" onclick="saveConfig()"
+                        style="width: 100%; justify-content: center; font-size: 0.8rem;">
+                        Save Config
                     </button>
                 </div>
             </div>
+        </div>
 
-            <!-- Main Content -->
-            <div class="main-content">
-                <!-- Control Panel -->
-                <div class="control-panel">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span class="status-indicator" id="status-indicator"></span>
-                            <span id="status-text">Disconnected</span>
-                        </div>
-                        <div>
-                            <button class="btn btn-success" id="start-btn" onclick="startRecording()">
-                                🎤 Start Recording
-                            </button>
-                            <button class="btn btn-danger" id="stop-btn" onclick="stopRecording()" style="display: none;">
-                                ⏹️ Stop Recording
-                            </button>
-                            <button class="btn btn-primary" onclick="clearConversation()">
-                                🗑️ Clear
-                            </button>
-                        </div>
+        <!-- MAIN CONTENT: Conversation Feed -->
+        <div class="main-content">
+            <div class="top-bar">
+                <h2 style="font-size: 1.2rem; font-weight: 600;">Live Transcription</h2>
+                <div class="search-bar">Search transcriptions...</div>
+                <div class="status-badge" id="status-text" style="color: var(--accent-red); font-weight: 600;">Standard
+                    Mode</div>
+            </div>
+
+            <div class="active-meeting-card">
+                <div class="active-meeting-header">
+                    <div>
+                        <h3 style="font-size: 1.5rem;">Current Session</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Real-time translation active</p>
+                    </div>
+                    <div id="status-indicator" class="status-indicator connected"></div>
+                </div>
+
+                <div id="conversation-area" class="conversation-area">
+                    <div
+                        style="flex: 1; display: flex; align-items: center; justify-content: center; color: #444; flex-direction: column;">
+                        <div style="font-size: 3rem; margin-bottom: 20px; opacity: 0.2;">🎙️</div>
+                        <p>Ready to capture.</p>
+                        <p style="font-size: 0.8rem;">Click Rec to start.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDEBAR: Stats & Speakers -->
+        <div class="sidebar-right">
+            <div class="profile-card">
+                <div class="profile-avatar">👤</div>
+                <div>
+                    <div style="font-weight: 700;">Admin User</div>
+                    <div style="font-size: 0.8rem; color: var(--accent-orange);">Pro Account</div>
+                </div>
+            </div>
+
+            <div class="metrics-card">
+                <h4 class="nav-section-title" style="margin-top: 0;">Session Performance</h4>
+
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-value" id="latency-total" style="color: #00C853;">--ms</div>
+                        <div class="stat-label">Latency</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" style="color: var(--accent-yellow);">Local</div>
+                        <div class="stat-label">Mode</div>
                     </div>
                 </div>
 
-                <!-- Conversation Area -->
-                <div class="conversation-area" id="conversation-area">
-                    <p style="text-align: center; color: #718096; margin-top: 50px;">
-                        Click "Start Recording" to begin...
-                    </p>
+                <div class="stat-row" style="margin-top: 20px;">
+                    <div class="stat-item">
+                        <div class="stat-value">Active</div>
+                        <div class="stat-label">Mic Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metrics-card" style="flex: 1; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 class="nav-section-title" style="margin-top: 0;">Speakers</h4>
+                    <button onclick="clearAllSpeakers()"
+                        style="background: none; border: none; color: #666; cursor: pointer;">🗑️</button>
+                </div>
+
+                <div id="speakers-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <!-- Speaker chips go here -->
+                    <p style="font-size: 0.8rem; color: #555;">No speakers detected.</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Latency Monitor -->
-    <div class="latency-monitor" id="latency-monitor">
-        <div class="latency-monitor-title">⚡ Performance</div>
-        <div class="latency-item">
-            <span class="latency-label">STT:</span>
-            <span class="latency-value" id="latency-stt">--ms</span>
-        </div>
-        <div class="latency-item">
-            <span class="latency-label">Speaker ID:</span>
-            <span class="latency-value" id="latency-speaker">--ms</span>
-        </div>
-        <div class="latency-item">
-            <span class="latency-label">Translation:</span>
-            <span class="latency-value" id="latency-translation">--ms</span>
-        </div>
-        <div class="latency-item">
-            <span class="latency-label">Total:</span>
-            <span class="latency-value" id="latency-total">--ms</span>
+    <!-- Hidden config fields for compatibility -->
+    <div style="display: none;">
+        <input id="source_language" value="">
+        <input id="processing_mode" value="local">
+        <input id="latency_priority" value="realtime">
+        <input id="use_intel_gpu" type="checkbox" checked>
+        <!-- enable_suggestions moved to sidebar -->
+        <input id="enable_sentiment" type="checkbox" checked>
+        <input id="show_latency_monitor" type="checkbox" checked>
+        <input id="openai_api_key">
+        <input id="deepgram_api_key">
+        <input id="deepl_api_key">
+    </div>
+
+    <!-- Modal for naming speakers -->
+    <div id="name-speaker-modal" class="modal" style="display: none;">
+        <div
+            style="background: var(--bg-card); padding: 30px; border-radius: var(--radius-lg); width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <h3>New Speaker Detected</h3>
+            <input type="text" id="speaker-name-input" placeholder="Enter name"
+                style="width: 100%; padding: 10px; margin: 20px 0; background: #333; border: 1px solid #444; color: white; border-radius: 8px;">
+            <input type="email" id="speaker-email-input" placeholder="Email (Optional)"
+                style="width: 100%; padding: 10px; margin-bottom: 20px; background: #333; border: 1px solid #444; color: white; border-radius: 8px;">
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-size: 0.9rem;">Spoken Language
+                    (detected/preferred)</label>
+                <select id="speaker-language-input"
+                    style="width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 8px;">
+                    <option value="">Auto / Mixed</option>
+                    <option value="en">English</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="zh">Chinese</option>
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="closeNameSpeakerModal()" class="btn btn-secondary">Cancel</button>
+                <button onclick="submitSpeakerName()" class="btn btn-primary">Save</button>
+            </div>
+            <div style="display: none;"><span id="speaker-id-display"></span></div>
         </div>
     </div>
 
     <script src="app.js"></script>
 </body>
+
 </html>

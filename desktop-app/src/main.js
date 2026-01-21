@@ -23,6 +23,12 @@ let autoStartOverlay = store.get('autoStartOverlay', true);
 // Disable hardware acceleration for better compatibility
 app.disableHardwareAcceleration();
 
+// Additional flags to prevent GPU crashes
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('ignore-gpu-blacklist');
+
 /**
  * Create main window
  */
@@ -289,10 +295,7 @@ function toggleInvisibleMode() {
     }
 
     // Update tray
-    if (tray) {
-        const contextMenu = tray.getContextMenu();
-        contextMenu.items[2].checked = isInvisibleMode;
-    }
+    updateTrayMenu();
 }
 
 /**

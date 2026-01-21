@@ -46,8 +46,12 @@ class ProcessVoiceTranslationUseCase:
         source_language: Optional[str] = None
     ) -> ConversationTurn:
         """Execute the use case for a single audio chunk."""
+        print(f"[UseCase] === Starting audio processing ===")
+        print(f"[UseCase] Audio chunk: {len(audio_chunk.data)} bytes, source_lang: {source_language}")
+
         # Step 1: Identify speaker (if enabled)
         speaker = await self._identify_speaker(audio_chunk)
+        print(f"[UseCase] Speaker identified: {speaker.speaker_id}")
 
         # Step 2: Transcribe audio
         transcription = await self.stt_service.transcribe(
@@ -55,29 +59,53 @@ class ProcessVoiceTranslationUseCase:
             language=source_language or speaker.language
         )
         transcription.speaker = speaker
+        print(f"[UseCase] Transcription: '{transcription.text}' (lang: {transcription.language})")
 
-        # Step 3: Detect language if not specified
+        # Step 3: Use Whisper's detected language (more accurate than langdetect for short texts)
         if not source_language:
-            source_language = await self.llm_service.detect_language(
-                transcription.text
-            )
+            # Whisper already detected the language during transcription
+            source_language = transcription.language
+            print(f"[UseCase] Using Whisper detected language: {source_language}")
+            
+            # STICKY LANGUAGE: If confident (e.g. not empty), save to speaker to avoid re-detection
+            if source_language and transcription.text and len(transcription.text) > 5 and not speaker.language:
+                try:
+                    print(f"[UseCase] Setting language '{source_language}' for speaker {speaker.speaker_id}")
+                    # Update local object
+                    speaker.language = source_language
+                    if hasattr(self.speaker_id_service, 'update_speaker_language'):
+                         # Run update in background task if possible, but strict await here for now
+                         print(f"[UseCase] Persisting language '{source_language}' for speaker {speaker.speaker_id}")
+                         await self.speaker_id_service.update_speaker_language(speaker.speaker_id, source_language)
+                    else:
+                         print("[UseCase] Service does not support update_speaker_language")
+                except Exception as e:
+                    print(f"[UseCase] Failed to update speaker language: {e}")
 
         # Step 4: Translate to target language
+        print(f"[UseCase] Translating: '{transcription.text}' from {source_language} to {self.target_language}")
         translation = await self.translation_service.translate(
             text=transcription.text,
             source_language=source_language,
             target_language=self.target_language
         )
+        print(f"[UseCase] Translation result: '{translation.translated_text}'")
 
         # Step 5: Generate suggestions (if enabled)
         suggestions = []
-        if self.enable_suggestions:
-            suggestions = await self.llm_service.generate_suggestions(
-                conversation_history=self.conversation_history,
-                current_translation=translation,
-                target_language=source_language,  # Suggest in speaker's language
-                num_suggestions=3
-            )
+        if self.enable_suggestions and transcription.text:
+            print(f"[UseCase] Generating suggestions...")
+            # Note: This adds latency. Ideally should be async/background.
+            try:
+                suggestions = await self.llm_service.generate_suggestions(
+                    conversation_history=self.conversation_history,
+                    current_translation=translation,
+                    target_language=source_language,
+                    num_suggestions=3
+                )
+                print(f"[UseCase] Generated {len(suggestions)} suggestions")
+            except Exception as e:
+                print(f"[UseCase] Error generating suggestions: {e}")
 
         # Update conversation history
         self.conversation_history.append(f"{speaker.speaker_id}: {transcription.text}")

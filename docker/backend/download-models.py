@@ -25,73 +25,119 @@ def download_whisper_model(model_name="large-v3"):
     """Download Whisper model for STT."""
     print(f"📥 Downloading Whisper model: {model_name}...")
 
-    from faster_whisper import WhisperModel
+    from faster_whisper import WhisperModel, download_model
 
-    model_path = MODELS_DIR / f"whisper-{model_name}"
+    model_dir = MODELS_DIR / f"whisper-{model_name}"
 
-    if model_path.exists():
-        print(f"✅ Whisper {model_name} already exists, skipping...")
+    if model_dir.exists() and any(model_dir.iterdir()):
+        print(f"✅ Whisper {model_name} already exists in {model_dir}, skipping...")
         return
 
     try:
-        # Download and cache
-        model = WhisperModel(model_name, device="cpu", compute_type="int8")
-        print(f"✅ Whisper {model_name} downloaded successfully!")
+        # Download to persistent directory
+        print(f"📥 Downloading to {model_dir}...")
+        path = download_model(model_name, output_dir=str(model_dir))
+        print(f"✅ Whisper {model_name} downloaded successfully to {path}!")
+        
+        # Verify load
+        WhisperModel(path, device="cpu", compute_type="int8")
+        print("✅ Whisper model loaded/verified.")
     except Exception as e:
         print(f"❌ Failed to download Whisper: {e}")
         sys.exit(1)
 
 
 def download_translation_model():
-    """Download translation model."""
-    print("📥 Downloading Translation model...")
+    """Download translation model (M2M100)."""
+    print("📥 Downloading Translation model (Facebook M2M100)...")
 
-    model_name = "Helsinki-NLP/opus-mt-en-pt"
-    model_path = MODELS_DIR / "translation"
+    model_id = "facebook/m2m100_418M"
+    base_url = f"https://huggingface.co/{model_id}/resolve/main"
+    
+    # Files required for M2M100
+    files = [
+        "config.json",
+        "pytorch_model.bin",
+        "vocab.json",
+        "sentencepiece.bpe.model",
+        "tokenizer_config.json",
+        "generation_config.json"
+    ]
 
-    if model_path.exists():
-        print("✅ Translation model already exists, skipping...")
-        return
+    model_dir = MODELS_DIR / "translation" / "m2m100_418M"
+    model_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        snapshot_download(
-            repo_id=model_name,
-            cache_dir=str(MODELS_DIR / "translation"),
-            local_dir=str(model_path)
-        )
-        print("✅ Translation model downloaded successfully!")
-    except Exception as e:
-        print(f"❌ Failed to download Translation model: {e}")
-        print("⚠️ Will use API-based translation instead")
+    for filename in files:
+        file_path = model_dir / filename
+        if file_path.exists():
+            # Check for corruption (e.g. invalid auth response usually < 10KB, model is > 1GB)
+            size = file_path.stat().st_size
+            if filename.endswith(".bin") and size < 1024 * 1024 * 1000: # 1GB
+                 print(f"⚠️ {filename} exists but looks corrupted ({size} bytes). Deleting to re-download...")
+                 file_path.unlink()
+            else:
+                 print(f"✅ {filename} already exists, skipping...")
+                 continue
+            
+        url = f"{base_url}/{filename}"
+        print(f"📥 Downloading {filename}...")
+        try:
+            # properly handle large files
+            urllib.request.urlretrieve(url, file_path)
+            print(f"✅ {filename} downloaded successfully!")
+        except Exception as e:
+            print(f"❌ Failed to download {filename}: {e}")
+            print("⚠️ Translation may not work without this file")
 
+def download_speechbrain_model():
+    """Download SpeechBrain Speaker ID model manually."""
+    print("📥 Downloading SpeechBrain Speaker ID model...")
+    
+    model_name = "speechbrain/spkrec-ecapa-voxceleb"
+    output_dir = MODELS_DIR / "speechbrain"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    base_url = "https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb/resolve/main"
+    files = [
+        "hyperparams.yaml",
+        "embedding_model.ckpt",
+        "mean_var_norm_emb.ckpt",
+        "classifier.ckpt",
+        "label_encoder.txt"
+    ]
+    
+    print(f"📥 Downloading SpeechBrain model to {output_dir}...")
+    
+    for filename in files:
+        url = f"{base_url}/{filename}"
+        dest_path = output_dir / filename
+        
+        if dest_path.exists():
+             print(f"✅ {filename} already exists, skipping...")
+             continue
+             
+        print(f"   - Fetching {filename}...")
+        try:
+            urllib.request.urlretrieve(url, dest_path)
+            print(f"✅ {filename} downloaded successfully!")
+        except Exception as e:
+            print(f"   ❌ Failed to download {filename}: {e}")
+            # Non-critical files might fail, but hyperparams and embedding_model are strict
+            if filename in ["hyperparams.yaml", "embedding_model.ckpt"]:
+                raise
 
 def download_pyannote_model():
-    """Download Pyannote speaker embedding model."""
+    """
+    Pyannote is gated, so we can't easily download it via script without token.
+    We rely on the app to download it at runtime if token is provided,
+    or use the fallback.
+    """
+    print("\n[3/5] Pyannote (Speaker ID)")
+    print("-" * 60)
     print("📥 Downloading Pyannote.audio embedding model...")
-
-    model_name = "pyannote/embedding"
-    model_path = MODELS_DIR / "pyannote"
-
-    if model_path.exists():
-        print("✅ Pyannote model already exists, skipping...")
-        return
-
-    try:
-        # Check for HuggingFace token
-        hf_token = os.getenv("HUGGINGFACE_TOKEN")
-
-        snapshot_download(
-            repo_id=model_name,
-            cache_dir=str(MODELS_DIR / "pyannote"),
-            local_dir=str(model_path),
-            token=hf_token
-        )
-        print("✅ Pyannote model downloaded successfully!")
-    except Exception as e:
-        print(f"❌ Failed to download Pyannote model: {e}")
-        print("⚠️ Note: pyannote/embedding requires HuggingFace token")
-        print("⚠️ Set HUGGINGFACE_TOKEN environment variable")
-        print("⚠️ Will use fallback embedding method")
+    # We skip actual download here as it requires auth. 
+    # The container will try to download on start if token env var is set.
+    print("✅ Pyannote model download skipped (requires auth/runtime init), skipping...")
 
 
 def download_llama_model():
@@ -171,6 +217,7 @@ def main():
         ("Whisper v3-turbo (STT)", download_whisper_model, ["large-v3"]),
         ("Translation", download_translation_model, []),
         ("Pyannote (Speaker ID)", download_pyannote_model, []),
+        ("SpeechBrain (Speaker ID)", download_speechbrain_model, []),
         ("Llama (LLM)", download_llama_model, []),
         ("Piper (TTS)", download_piper_voice, []),
     ]

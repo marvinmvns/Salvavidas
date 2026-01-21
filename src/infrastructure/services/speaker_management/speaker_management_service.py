@@ -21,7 +21,8 @@ from ....core.entities.speaker_management import (
     VoiceProfileQuality,
     EnrollmentStatus,
 )
-from .pyannote_embedding_service import create_embedding_service
+from .speechbrain_service import SpeechBrainEmbeddingService
+from .pyannote_embedding_service import create_embedding_service # Keep for fallback or API mode if needed, but we prefer SpeechBrain now
 
 
 class SpeakerManagementService(ISpeakerManagementService):
@@ -53,12 +54,15 @@ class SpeakerManagementService(ISpeakerManagementService):
         """
         self.database_path = database_path
 
-        # Initialize embedding service (Pyannote or fallback)
-        self.embedding_service = create_embedding_service(
-            model_name=pyannote_model if use_pyannote else None,
-            use_auth_token=huggingface_token,
-            fallback_on_error=True
-        )
+        self.database_path = database_path
+
+        # Initialize embedding service (SpeechBrain for local)
+        try:
+            self.embedding_service = SpeechBrainEmbeddingService()
+        except Exception as e:
+            print(f"[SpeakerMgmt] Failed to load SpeechBrain: {e}")
+            from .pyannote_embedding_service import FallbackEmbeddingService
+            self.embedding_service = FallbackEmbeddingService()
 
         print(f"[SpeakerMgmt] Embedding service initialized: {type(self.embedding_service).__name__}")
         print(f"[SpeakerMgmt] Embedding dimension: {self.embedding_service.get_embedding_dimension()}")
@@ -72,11 +76,13 @@ class SpeakerManagementService(ISpeakerManagementService):
 
         # Unknown speaker counter
         self.unknown_speaker_count = 0
+        self.temporary_speakers: Dict[str, dict] = {}
 
         # Configuration
         self.min_samples_required = 3
         self.max_samples_allowed = 10
-        self.identification_threshold = 0.7  # Confidence threshold for identification
+        self.identification_threshold = 0.25  # For enrolled speakers
+        self.temp_speaker_threshold = 0.02  # Very low - embeddings seem to have low similarity
 
     async def start_enrollment(
         self,
@@ -195,12 +201,23 @@ class SpeakerManagementService(ISpeakerManagementService):
         # If no enrolled speakers, it's a new speaker
         if not self.speaker_embeddings:
             self.unknown_speaker_count += 1
+            temp_id = f"Speaker {self.unknown_speaker_count}"
+            
+            # Cache for potential enrollment
+            if not hasattr(self, 'temporary_speakers'):
+                 self.temporary_speakers = {}
+                 
+            self.temporary_speakers[temp_id] = {
+                "embedding": query_embedding,
+                "timestamp": datetime.now()
+            }
+
             return SpeakerIdentificationResult(
                 identified=False,
                 speaker=None,
                 confidence=0.0,
                 is_new_speaker=True,
-                suggested_name=f"Speaker {self.unknown_speaker_count}"
+                suggested_name=temp_id
             )
 
         # Compare with all enrolled speakers
@@ -209,6 +226,7 @@ class SpeakerManagementService(ISpeakerManagementService):
 
         for speaker_id, speaker_embedding in self.speaker_embeddings.items():
             similarity = self._calculate_similarity(query_embedding, speaker_embedding)
+            print(f"[SpeakerMgmt] Comparing with {speaker_id}: {similarity:.4f}")
 
             if similarity > best_similarity:
                 best_similarity = similarity
@@ -232,19 +250,87 @@ class SpeakerManagementService(ISpeakerManagementService):
                 is_new_speaker=False,
             )
         else:
-            # Unknown speaker
+            # Check against temporary speakers first
+            best_temp_match = None
+            best_temp_similarity = 0.0
+
+            for temp_id, temp_data in self.temporary_speakers.items():
+                temp_similarity = self._calculate_similarity(query_embedding, temp_data["embedding"])
+                print(f"[SpeakerMgmt] Comparing with temp {temp_id}: {temp_similarity:.4f}")
+                if temp_similarity > best_temp_similarity:
+                    best_temp_similarity = temp_similarity
+                    best_temp_match = temp_id
+
+            # If matches existing temporary speaker, reuse it
+            if best_temp_match and best_temp_similarity >= self.temp_speaker_threshold:
+                # Update the embedding with running average
+                temp_data = self.temporary_speakers[best_temp_match]
+                temp_data["embedding"] = (temp_data["embedding"] + query_embedding) / 2
+                temp_data["timestamp"] = datetime.now()
+
+                # Create temporary speaker object to pass metadata (like language)
+                temp_speaker_obj = EnrolledSpeaker(
+                    speaker_id=best_temp_match,
+                    name=best_temp_match,
+                    email=None,
+                    language=temp_data.get("language"), # Pass saved language
+                    organization=None,
+                    notes=None,
+                    voice_embedding=None,
+                    sample_count=1,
+                    enrollment_date=temp_data["timestamp"]
+                )
+
+                return SpeakerIdentificationResult(
+                    identified=False,
+                    speaker=temp_speaker_obj, # Pass object so UseCase can see language
+                    confidence=best_temp_similarity,
+                    is_new_speaker=False,  # Not new, matched temp speaker
+                    suggested_name=best_temp_match
+                )
+
+            # Truly unknown speaker - create new temporary speaker
             self.unknown_speaker_count += 1
+            temp_id = f"Speaker {self.unknown_speaker_count}"
+
+            # Cache for potential enrollment
+            self.temporary_speakers[temp_id] = {
+                "embedding": query_embedding,
+                "timestamp": datetime.now()
+            }
+
             return SpeakerIdentificationResult(
                 identified=False,
                 speaker=None,
                 confidence=best_similarity,
                 is_new_speaker=True,
-                suggested_name=f"Speaker {self.unknown_speaker_count}"
+                suggested_name=temp_id
             )
 
     async def get_all_speakers(self) -> List[EnrolledSpeaker]:
         """Get all enrolled speakers."""
         return list(self.enrolled_speakers.values())
+
+    async def update_speaker_language(self, speaker_id: str, language: str) -> bool:
+        """Update language preference for a speaker (enrolled or temporary)."""
+        # Check enrolled speakers
+        if speaker_id in self.enrolled_speakers:
+            self.enrolled_speakers[speaker_id].language = language
+            # TODO: Persist to DB
+            return True
+        
+        # Check temporary speakers (store/update in temp metadata)
+        if speaker_id in self.temporary_speakers:
+            self.temporary_speakers[speaker_id]["language"] = language
+            return True
+        
+        # Check if speaker_id matches a temporary speaker suggested_name
+        for temp_id, data in self.temporary_speakers.items():
+            if temp_id == speaker_id:
+                data["language"] = language
+                return True
+                
+        return False
 
     async def get_speaker(
         self,
@@ -406,6 +492,7 @@ class SpeakerManagementService(ISpeakerManagementService):
     ) -> bool:
         """
         Update the name and email of an enrolled speaker.
+        If speaker_id corresponds to a cached temporary speaker, enroll them.
 
         Args:
             speaker_id: Unique speaker identifier
@@ -415,17 +502,61 @@ class SpeakerManagementService(ISpeakerManagementService):
         Returns:
             True if successful, False if speaker not found
         """
-        if speaker_id not in self.enrolled_speakers:
-            return False
+        # Check if it's an enrolled speaker
+        if speaker_id in self.enrolled_speakers:
+            speaker = self.enrolled_speakers[speaker_id]
+            speaker.name = name
+            if email:
+                speaker.email = email
+            speaker.updated_at = datetime.now()
+            print(f"[SpeakerMgmt] Updated speaker {speaker_id}: name='{name}'")
+            return True
 
-        speaker = self.enrolled_speakers[speaker_id]
-        speaker.name = name
-        if email:
-            speaker.email = email
-        speaker.updated_at = datetime.now()
+        # Check if it's a temporary unknown speaker
+        if hasattr(self, 'temporary_speakers') and speaker_id in self.temporary_speakers:
+            print(f"[SpeakerMgmt] Promoting temporary speaker {speaker_id} to enrolled speaker '{name}'")
+            try:
+                temp_data = self.temporary_speakers[speaker_id]
+                embedding = temp_data["embedding"]
+                
+                # Create new enrolled speaker
+                new_id = str(uuid.uuid4())
+                print(f"[SpeakerMgmt] Generated new UUID: {new_id} for {name}")
+                
+                speaker = EnrolledSpeaker(
+                    speaker_id=new_id,
+                    name=name,
+                    email=email,
+                    language="en",
+                    organization=None,
+                    notes="Ad-hoc enrollment from live session",
+                    voice_embedding=embedding.tobytes(),
+                    sample_count=1,
+                    enrollment_date=datetime.now(),
+                )
+                
+                # Save using the ORIGINAL ID (Speaker N) as key so the frontend stays consistent
+                # But the internal object has the new UUID.
+                # This ensures we can look it up by "Speaker N" until refresh.
+                self.enrolled_speakers[speaker_id] = speaker
+                self.speaker_embeddings[speaker_id] = embedding
+                
+                # Also save with the NEW UUID for future persistence correctness
+                self.enrolled_speakers[new_id] = speaker
+                self.speaker_embeddings[new_id] = embedding
+                
+                del self.temporary_speakers[speaker_id]
+                print(f"[SpeakerMgmt] Successfully promoted {speaker_id}")
+                return True
+            except Exception as e:
+                print(f"[SpeakerMgmt] Error promoting speaker: {e}")
+                import traceback
+                traceback.print_exc()
+                raise e
 
-        print(f"[SpeakerMgmt] Updated speaker {speaker_id}: name='{name}', email='{email}'")
-        return True
+        # If we get here, speaker was not found in temporary list
+        print(f"[SpeakerMgmt] Update failed: Speaker ID '{speaker_id}' not found. Available Temp: {list(self.temporary_speakers.keys()) if hasattr(self, 'temporary_speakers') else 'None'}")
+        return False
 
     # Helper methods
 

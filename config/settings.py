@@ -63,14 +63,20 @@ class Settings(BaseSettings):
 
     # Local model paths
     whisper_model: str = Field(default="base")
-    llama_model_path: str = Field(default="./models/llama-2-7b-chat.Q4_K_M.gguf")
+    llama_model_path: str = Field(default="/app/data/models/llama-7b-chat.gguf")
     translation_model: str = Field(default="Helsinki-NLP/opus-mt-en-pt")
+
+    # System settings
+    use_intel_gpu: bool = Field(default=True)
+    tz: str = Field(default="America/Sao_Paulo")
+    log_level: str = Field(default="INFO")
 
     class Config:
         """Pydantic config."""
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"  # Allow extra fields from .env or config DB
 
 
 def get_settings() -> Settings:

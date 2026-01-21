@@ -21,8 +21,35 @@ const languageFlags = {
 document.addEventListener('DOMContentLoaded', async () => {
     await loadConfig();
     await loadSpeakers();
+    await loadAudioDevices();
     connectWebSocket();
 });
+
+// Load audio input devices
+async function loadAudioDevices() {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        const select = document.getElementById('audio_input_device');
+
+        // Keep default option
+        select.innerHTML = '<option value="default">Default</option>';
+
+        audioInputs.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `Microphone ${select.length + 1}`;
+            select.appendChild(option);
+        });
+
+        // Listen for changes
+        navigator.mediaDevices.ondevicechange = loadAudioDevices;
+
+    } catch (error) {
+        console.error('Error loading audio devices:', error);
+    }
+}
 
 // Load configuration from server
 async function loadConfig() {
@@ -351,7 +378,9 @@ async function submitSpeakerName() {
             // Close modal
             closeNameSpeakerModal();
         } else {
-            alert(`❌ Erro ao nomear falante: ${result.message || 'Desconhecido'}`);
+            // Show error message (handling 'detail' from FastAPI or 'message' from logic)
+            const errorMsg = result.message || result.detail || 'Erro desconhecido';
+            alert(`❌ Erro ao nomear falante: ${errorMsg}`);
         }
     } catch (error) {
         console.error('Error naming speaker:', error);
@@ -368,49 +397,83 @@ function updateStatus(status, text) {
     statusText.textContent = text;
 }
 
+// Toggle System Active State
+function toggleSystem(checkbox) {
+    const statusLabel = document.getElementById('monitor-status');
+
+    if (checkbox.checked) {
+        statusLabel.textContent = "Listening...";
+        statusLabel.style.color = "var(--success)";
+        startRecording();
+    } else {
+        statusLabel.textContent = "Inactive";
+        statusLabel.style.color = "var(--text-secondary)";
+        stopRecording();
+    }
+}
+
 // Start recording
 async function startRecording() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const deviceId = document.getElementById('audio_input_device').value;
+        const constraints = {
             audio: {
                 channelCount: 1,
                 sampleRate: 16000,
-            }
-        });
-
-        audioContext = new AudioContext({ sampleRate: 16000 });
-        const source = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-
-        processor.onaudioprocess = (e) => {
-            if (!isRecording) return;
-
-            const inputData = e.inputBuffer.getChannelData(0);
-            const outputData = new Int16Array(inputData.length);
-
-            // Convert float to int16
-            for (let i = 0; i < inputData.length; i++) {
-                const s = Math.max(-1, Math.min(1, inputData[i]));
-                outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-            }
-
-            // Send to server
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(outputData.buffer);
+                deviceId: deviceId !== 'default' ? { exact: deviceId } : undefined
             }
         };
 
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // Initialize AudioContext if needed
+        if (!audioContext || audioContext.state === 'closed') {
+            // Try to request 16kHz, but browser may ignore it
+            audioContext = new AudioContext({ sampleRate: 16000 });
+        } else if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+
+        console.log(`[Audio] AudioContext Sample Rate: ${audioContext.sampleRate}Hz`);
+
+        // Add the AudioWorklet module
+        try {
+            await audioContext.audioWorklet.addModule('pcm-processor.js');
+        } catch (e) {
+            console.warn('Module maybe already added or error:', e);
+        }
+
+        const source = audioContext.createMediaStreamSource(stream);
+
+        // Pass the ACTUAL sample rate to the processor so it can downsample if needed
+        const workletNode = new AudioWorkletNode(audioContext, 'pcm-processor', {
+            processorOptions: {
+                sampleRate: audioContext.sampleRate
+            }
+        });
+
+        workletNode.port.onmessage = (event) => {
+            if (ws && ws.readyState === WebSocket.OPEN && isRecording) {
+                ws.send(event.data);
+            }
+        };
+
+        source.connect(workletNode);
+        workletNode.connect(audioContext.destination);
+
+        // Store references to clean up later
+        mediaRecorder = { source, workletNode, stream };
+
         isRecording = true;
         updateStatus('recording', 'Recording...');
-        document.getElementById('start-btn').style.display = 'none';
-        document.getElementById('stop-btn').style.display = 'inline-block';
+
+        // Ensure switch is synced if called programmatically
+        const toggle = document.getElementById('system-toggle');
+        if (toggle && !toggle.checked) toggle.checked = true;
 
     } catch (error) {
         console.error('Error starting recording:', error);
-        alert('Error accessing microphone. Please grant permission.');
+        alert('Error accessing microphone/audio: ' + error.message);
     }
 }
 
@@ -418,14 +481,34 @@ async function startRecording() {
 function stopRecording() {
     isRecording = false;
 
+    if (mediaRecorder) {
+        if (mediaRecorder.workletNode) {
+            mediaRecorder.workletNode.disconnect();
+            mediaRecorder.workletNode.port.onmessage = null;
+        }
+        if (mediaRecorder.source) {
+            mediaRecorder.source.disconnect();
+        }
+        if (mediaRecorder.stream) {
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+        mediaRecorder = null;
+    }
+
     if (audioContext) {
         audioContext.close();
         audioContext = null;
     }
 
     updateStatus('connected', 'Connected');
-    document.getElementById('start-btn').style.display = 'inline-block';
-    document.getElementById('stop-btn').style.display = 'none';
+
+    // Ensure switch is synced
+    const toggle = document.getElementById('system-toggle');
+    if (toggle && toggle.checked) {
+        toggle.checked = false;
+        document.getElementById('monitor-status').textContent = "Inactive";
+        document.getElementById('monitor-status').style.color = "var(--text-secondary)";
+    }
 }
 
 // Display conversation turn
@@ -490,7 +573,14 @@ function displayConversationTurn(data) {
     `;
 
     conversationArea.appendChild(messageDiv);
-    conversationArea.scrollTop = conversationArea.scrollHeight;
+
+    // Auto-scroll to latest message with smooth animation
+    requestAnimationFrame(() => {
+        conversationArea.scrollTo({
+            top: conversationArea.scrollHeight,
+            behavior: 'smooth'
+        });
+    });
 }
 
 // Copy suggestion to clipboard

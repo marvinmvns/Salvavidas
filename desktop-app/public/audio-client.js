@@ -32,17 +32,12 @@ class AudioClient {
         console.log('[AudioClient] Initializing...');
 
         try {
-            // Import AudioCaptureManager (in renderer context)
-            const AudioCaptureManager = require('../src/audio-capture');
-            this.audioCapture = new AudioCaptureManager();
-
-            // Initialize audio capture
-            await this.audioCapture.initialize({
+            // Initialize audio capture (using Web APIs, no electron required)
+            await this.initializeAudioCapture({
                 captureMicrophone,
                 captureSystemAudio,
                 mixStreams,
-                sampleRate,
-                onAudioData: (audioBuffer) => this.sendAudioData(audioBuffer)
+                sampleRate
             });
 
             console.log('[AudioClient] Audio capture initialized');
@@ -56,6 +51,160 @@ class AudioClient {
             console.error('[AudioClient] Initialization failed:', error);
             throw error;
         }
+    }
+
+    /**
+     * Initialize audio capture using Web APIs
+     */
+    async initializeAudioCapture(options) {
+        const { captureMicrophone, captureSystemAudio, mixStreams, sampleRate } = options;
+
+        // Create audio context
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+
+        // Capture microphone
+        let micStream = null;
+        if (captureMicrophone) {
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: sampleRate,
+                    channelCount: 1
+                },
+                video: false
+            });
+        }
+
+        // For system audio capture, we need to use screen sharing with audio
+        let systemStream = null;
+        if (captureSystemAudio) {
+            try {
+                systemStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        displaySurface: 'monitor'
+                    },
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        sampleRate: sampleRate,
+                        channelCount: 1
+                    }
+                });
+
+                // Stop the video track immediately (we only want audio)
+                const videoTrack = systemStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.stop();
+                    systemStream.removeTrack(videoTrack);
+                }
+            } catch (error) {
+                console.warn('[AudioClient] System audio capture not available:', error.message);
+            }
+        }
+
+        // Create simple audio capture manager
+        this.audioCapture = {
+            audioContext,
+            micStream,
+            systemStream,
+            processorNode: null,
+            isCapturing: false,
+
+            start: function() {
+                if (this.isCapturing) return;
+
+                console.log('[AudioCapture] Starting...');
+                this.isCapturing = true;
+
+                // Create a destination to mix streams
+                const destination = audioContext.createMediaStreamDestination();
+
+                // Connect microphone
+                if (micStream) {
+                    const micSource = audioContext.createMediaStreamSource(micStream);
+                    micSource.connect(destination);
+                }
+
+                // Connect system audio
+                if (systemStream) {
+                    const systemSource = audioContext.createMediaStreamSource(systemStream);
+                    systemSource.connect(destination);
+                }
+
+                // Create processor to get PCM data
+                const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+                const source = audioContext.createMediaStreamSource(destination.stream);
+                source.connect(processorNode);
+                processorNode.connect(audioContext.destination);
+
+                const self = this;
+                processorNode.onaudioprocess = function(e) {
+                    if (!self.isCapturing) return;
+
+                    const inputData = e.inputBuffer.getChannelData(0);
+
+                    // Convert float32 to int16 PCM
+                    const pcmData = new Int16Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+
+                    // Send to callback
+                    if (self.onAudioDataCallback) {
+                        self.onAudioDataCallback(pcmData.buffer);
+                    }
+                };
+
+                this.processorNode = processorNode;
+                this.onAudioDataCallback = (buffer) => {
+                    if (this.isCapturing) {
+                        window.audioClient.sendAudioData(buffer);
+                    }
+                };
+            },
+
+            stop: function() {
+                console.log('[AudioCapture] Stopping...');
+                this.isCapturing = false;
+
+                if (this.processorNode) {
+                    this.processorNode.disconnect();
+                    this.processorNode = null;
+                }
+            },
+
+            cleanup: async function() {
+                this.stop();
+
+                if (this.micStream) {
+                    this.micStream.getTracks().forEach(track => track.stop());
+                    this.micStream = null;
+                }
+
+                if (this.systemStream) {
+                    this.systemStream.getTracks().forEach(track => track.stop());
+                    this.systemStream = null;
+                }
+
+                if (this.audioContext && this.audioContext.state !== 'closed') {
+                    await this.audioContext.close();
+                }
+            },
+
+            getStatus: function() {
+                return {
+                    isCapturing: this.isCapturing,
+                    hasMicrophone: !!this.micStream,
+                    hasSystemAudio: !!this.systemStream
+                };
+            }
+        };
+
+        // Store reference for callback
+        window.audioClient = this;
     }
 
     /**
@@ -105,6 +254,10 @@ class AudioClient {
             } else if (message.type === 'transcription') {
                 console.log('[AudioClient] Transcription received:', message);
                 this.emit('transcription', message);
+
+            } else if (message.type === 'new_speaker_detected') {
+                console.log('[AudioClient] New speaker detected:', message);
+                this.emit('transcription', message);  // Use same handler in overlay
 
             } else if (message.type === 'error') {
                 console.error('[AudioClient] Server error:', message.message);

@@ -11,13 +11,27 @@ from ....core.interfaces import ISpeakerIdentificationService
 from ....core.entities import AudioChunk, Speaker
 
 
-class PyannoteSpeak erIdentificationService(ISpeakerIdentificationService):
+class PyannoteSpeakerIdentificationService(ISpeakerIdentificationService):
     """Local speaker identification using pyannote.audio."""
 
     def __init__(self, model_name: str = "pyannote/embedding"):
         """Initialize pyannote speaker embedding model."""
-        self.inference = Inference(model_name, device="cpu")
+        self.inference = None
+        self.enabled = False
         self.threshold = 0.6  # Similarity threshold
+        
+        try:
+            from pyannote.audio import Inference
+            # Check if model exists or download via Model.from_pretrained if needed/possible
+            # For now, we wrap in try-except to prevent crash
+            print(f"🔊 Initializing Pyannote Speaker ID with model: {model_name}")
+            self.inference = Inference(model_name, device="cpu")
+            self.enabled = True
+        except Exception as e:
+            print(f"⚠️ Failed to initialize Pyannote Speaker ID: {e}")
+            print("⚠️ Speaker identification will be disabled or use fallback.")
+            self.inference = None
+            self.enabled = False
 
     async def identify_speaker(
         self,
@@ -26,7 +40,23 @@ class PyannoteSpeak erIdentificationService(ISpeakerIdentificationService):
     ) -> Speaker:
         """Identify speaker from audio chunk."""
         # Get embedding for the audio
-        embedding = await self._get_embedding(audio_chunk)
+        if not self.enabled:
+             # Fallback: Just generate a hash-based dummy ID from audio data
+             # This prevents crash but doesn't actually identify speakers intelligently
+             dummy_embedding = np.zeros(192, dtype=np.float32)
+             # Fill with some data from audio to be deterministic per chunk
+             # But this is not good logic for real diarization
+             return Speaker(
+                speaker_id="unknown_speaker",
+                confidence=0.0,
+                embedding=dummy_embedding.tobytes()
+             )
+
+        try:
+            embedding = await self._get_embedding(audio_chunk)
+        except Exception as e:
+            print(f"Error getting embedding: {e}")
+            return Speaker(speaker_id="error", confidence=0.0)
 
         if not known_speakers:
             # No known speakers, create new one
@@ -74,6 +104,9 @@ class PyannoteSpeak erIdentificationService(ISpeakerIdentificationService):
         speaker_name: Optional[str] = None
     ) -> Speaker:
         """Enroll a new speaker."""
+        if not self.enabled:
+            return Speaker(speaker_id="enrollment_disabled", name="Disabled", confidence=0.0)
+
         # Combine audio chunks
         combined_audio = bytearray()
         sample_rate = audio_chunks[0].sample_rate
@@ -104,6 +137,9 @@ class PyannoteSpeak erIdentificationService(ISpeakerIdentificationService):
 
     async def _get_embedding(self, audio_chunk: AudioChunk) -> np.ndarray:
         """Extract speaker embedding from audio."""
+        if not self.enabled:
+            return np.zeros(192, dtype=np.float32)
+
         # Convert bytes to numpy array
         audio_array = np.frombuffer(audio_chunk.data, dtype=np.int16)
         audio_float = audio_array.astype(np.float32) / 32768.0

@@ -3,8 +3,11 @@
 .gitignore
 .gitattributes
 
-# Docker
+# Docker (exclude most, but keep backend scripts needed for build)
 docker/
+!docker/backend/
+!docker/backend/*.py
+!docker/backend/*.sh
 Dockerfile
 docker-compose*.yml
 .dockerignore

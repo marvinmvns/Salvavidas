@@ -25,7 +25,7 @@ class PyannoteEmbeddingService:
     def __init__(
         self,
         model_name: str = "pyannote/embedding",
-        use_auth_token: Optional[str] = None,
+        token: Optional[str] = None,
         device: Optional[str] = None
     ):
         """
@@ -33,7 +33,7 @@ class PyannoteEmbeddingService:
 
         Args:
             model_name: Hugging Face model name (default: pyannote/embedding)
-            use_auth_token: Hugging Face token for gated models
+            token: Hugging Face token for gated models
             device: Device to use ('cuda', 'cpu', or None for auto)
         """
         if not PYANNOTE_AVAILABLE:
@@ -43,7 +43,7 @@ class PyannoteEmbeddingService:
             )
 
         self.model_name = model_name
-        self.use_auth_token = use_auth_token
+        self.token = token
 
         # Determine device
         if device is None:
@@ -60,7 +60,7 @@ class PyannoteEmbeddingService:
             # Try using PretrainedSpeakerEmbedding (recommended)
             self.model = PretrainedSpeakerEmbedding(
                 self.model_name,
-                use_auth_token=self.use_auth_token,
+                token=self.token,
                 device=self.device
             )
             print(f"[Pyannote] Model loaded: {self.model_name} on {self.device}")
@@ -70,7 +70,7 @@ class PyannoteEmbeddingService:
             print(f"[Pyannote] Fallback to Inference API: {e}")
             self.model = Inference(
                 self.model_name,
-                use_auth_token=self.use_auth_token,
+                token=self.token,
                 device=self.device
             )
 
@@ -237,7 +237,7 @@ class FallbackEmbeddingService:
 
 def create_embedding_service(
     model_name: str = "pyannote/embedding",
-    use_auth_token: Optional[str] = None,
+    token: Optional[str] = None,
     device: Optional[str] = None,
     fallback_on_error: bool = True
 ) -> 'PyannoteEmbeddingService | FallbackEmbeddingService':
@@ -246,7 +246,7 @@ def create_embedding_service(
 
     Args:
         model_name: Pyannote model name
-        use_auth_token: Hugging Face token
+        token: Hugging Face token
         device: Device to use
         fallback_on_error: Use fallback if Pyannote fails
 
@@ -262,7 +262,7 @@ def create_embedding_service(
     try:
         return PyannoteEmbeddingService(
             model_name=model_name,
-            use_auth_token=use_auth_token,
+            token=token,
             device=device
         )
     except Exception as e:

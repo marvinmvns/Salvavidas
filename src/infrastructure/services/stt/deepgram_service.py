@@ -1,8 +1,15 @@
 """Deepgram API STT service implementation - Ultra low latency."""
 from typing import AsyncIterator, Optional
 from datetime import datetime
-from deepgram import DeepgramClient, PrerecordedOptions, LiveOptions
 import asyncio
+import warnings
+
+try:
+    from deepgram import DeepgramClient
+    DEEPGRAM_AVAILABLE = True
+except ImportError:
+    DEEPGRAM_AVAILABLE = False
+    warnings.warn("Deepgram SDK not found. Deepgram services will be disabled.")
 
 from ....core.interfaces import ISpeechToTextService
 from ....core.entities import AudioChunk, TranscriptionSegment, Speaker
@@ -13,6 +20,9 @@ class DeepgramSTTService(ISpeechToTextService):
 
     def __init__(self, api_key: str, model: str = "nova-2"):
         """Initialize Deepgram client."""
+        if not DEEPGRAM_AVAILABLE:
+            raise RuntimeError("Deepgram SDK is not available")
+            
         self.client = DeepgramClient(api_key)
         self.model = model
 
@@ -22,14 +32,14 @@ class DeepgramSTTService(ISpeechToTextService):
         language: Optional[str] = None
     ) -> TranscriptionSegment:
         """Transcribe audio chunk using Deepgram."""
-        options = PrerecordedOptions(
-            model=self.model,
-            language=language or "en",
-            smart_format=True,
-            punctuate=True,
-            diarize=True,  # Speaker diarization
-            utterances=True,
-        )
+        options = {
+            "model": self.model,
+            "language": language or "en",
+            "smart_format": True,
+            "punctuate": True,
+            "diarize": True,
+            "utterances": True,
+        }
 
         try:
             response = await asyncio.to_thread(
@@ -57,12 +67,12 @@ class DeepgramSTTService(ISpeechToTextService):
             # Get speaker info if available
             speaker_id = "speaker_0"
             if alternative.words and len(alternative.words) > 0:
-                speaker_id = f"speaker_{alternative.words[0].speaker or 0}"
+                speaker_id = f"speaker_{getattr(alternative.words[0], 'speaker', 0) or 0}"
 
             return TranscriptionSegment(
                 text=alternative.transcript,
                 speaker=Speaker(speaker_id=speaker_id),
-                language=results.channels[0].detected_language or language or "en",
+                language=getattr(channel, 'detected_language', None) or language or "en",
                 timestamp=audio_chunk.timestamp,
                 confidence=alternative.confidence,
                 start_time=alternative.words[0].start if alternative.words else 0.0,
@@ -78,15 +88,15 @@ class DeepgramSTTService(ISpeechToTextService):
         language: Optional[str] = None
     ) -> AsyncIterator[TranscriptionSegment]:
         """Transcribe audio stream using Deepgram Live API."""
-        options = LiveOptions(
-            model=self.model,
-            language=language or "en",
-            smart_format=True,
-            punctuate=True,
-            interim_results=False,
-            utterance_end_ms=1000,
-            vad_events=True,
-        )
+        options = {
+            "model": self.model,
+            "language": language or "en",
+            "smart_format": True,
+            "punctuate": True,
+            "interim_results": False,
+            "utterance_end_ms": 1000,
+            "vad_events": True,
+        }
 
         connection = self.client.listen.live.v("1")
         transcription_queue = asyncio.Queue()

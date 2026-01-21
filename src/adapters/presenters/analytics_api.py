@@ -181,7 +181,7 @@ def create_analytics_router(analytics_service: IAnalyticsService) -> APIRouter:
         time_range: TimeRange = Query(TimeRange.LAST_WEEK),
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        granularity: str = Query("hour", regex="^(minute|hour|day)$")
+        granularity: str = Query("hour", pattern="^(minute|hour|day)$")
     ):
         """Get sentiment data over time for charting."""
         try:

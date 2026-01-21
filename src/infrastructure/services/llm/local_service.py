@@ -42,66 +42,105 @@ class LocalLLMService(ILanguageModelService):
             # Build context
             context = "\n".join(conversation_history[-5:])
 
-            # Create prompt
-            prompt = f"""<s>[INST] Given this conversation:
-{context}
+            # Create prompt for better suggestions
+            prompt = f"""<s>[INST] You are a helpful assistant. The other person said: "{current_translation.translated_text}"
 
-The other person just said: "{current_translation.translated_text}"
+Generate exactly {num_suggestions} short, natural response options in {target_language} language.
+Format: One response per line, numbered.
 
-Generate {num_suggestions} natural responses in {target_language}. Be concise.
+Example:
+1. First response
+2. Second response
+3. Third response
+[/INST]
 
-Responses:
-[/INST]"""
+Sure! Here are {num_suggestions} natural responses in {target_language}:
+
+"""
 
             # Generate
             output = self.llm(
                 prompt,
-                max_tokens=200,
-                temperature=0.8,
-                top_p=0.9,
-                stop=["</s>", "\n\n"]
+                max_tokens=300,
+                temperature=0.7,
+                top_p=0.95,
+                stop=["</s>", "[INST]"]
             )
 
             response_text = output["choices"][0]["text"].strip()
+            print(f"[LLM] Raw response: {response_text}")
 
             # Parse suggestions (simple split)
             suggestions = []
             lines = [l.strip() for l in response_text.split("\n") if l.strip()]
+            print(f"[LLM] Parsed {len(lines)} lines from response")
 
             for i, line in enumerate(lines[:num_suggestions]):
-                # Remove numbering if present
-                text = line.lstrip("0123456789.-) ")
+                # Remove numbering if present (1. 2. 3. etc)
+                text = line
+                # Remove common prefixes
+                for prefix in ["1.", "2.", "3.", "4.", "5.", "-", "*", "•"]:
+                    if text.startswith(prefix):
+                        text = text[len(prefix):].strip()
 
-                suggestions.append(
+                if text:  # Only add non-empty suggestions
+                    suggestions.append(
+                        SuggestionResponse(
+                            text=text,
+                            language=target_language,
+                            confidence=0.7,
+                            context=current_translation.translated_text,
+                            alternatives=[]
+                        )
+                    )
+                    print(f"[LLM] Suggestion {i+1}: {text}")
+
+            # Ensure we have at least some suggestions
+            if not suggestions:
+                print(f"[LLM] Warning: No suggestions parsed, using fallback")
+                # Language-specific fallbacks
+                fallbacks = {
+                    "pt": ["Entendi!", "Obrigado!", "Pode explicar melhor?"],
+                    "en": ["I understand!", "Thank you!", "Could you explain more?"],
+                    "es": ["¡Entiendo!", "¡Gracias!", "¿Puedes explicar más?"],
+                    "fr": ["Je comprends!", "Merci!", "Pouvez-vous expliquer plus?"]
+                }
+                default_fallback = ["I see!", "Thanks!", "Tell me more."]
+                texts = fallbacks.get(target_language, default_fallback)
+
+                suggestions = [
                     SuggestionResponse(
                         text=text,
                         language=target_language,
-                        confidence=0.7,
-                        context=current_translation.translated_text,
+                        confidence=0.5,
+                        context="",
                         alternatives=[]
                     )
-                )
+                    for text in texts[:num_suggestions]
+                ]
 
-            return suggestions if suggestions else [
-                SuggestionResponse(
-                    text="Thank you!",
-                    language=target_language,
-                    confidence=0.5,
-                    context="",
-                    alternatives=[]
-                )
-            ]
+            return suggestions
 
         except Exception as e:
-            # Fallback suggestions
+            print(f"[LLM] Error generating suggestions: {e}")
+            # Fallback suggestions based on language
+            fallbacks = {
+                "pt": ["Entendi!", "Obrigado!", "Pode explicar melhor?"],
+                "en": ["I understand!", "Thank you!", "Could you explain more?"],
+                "es": ["¡Entiendo!", "¡Gracias!", "¿Puedes explicar más?"]
+            }
+            default_fallback = ["I see!", "Thanks!", "Tell me more."]
+            texts = fallbacks.get(target_language, default_fallback)
+
             return [
                 SuggestionResponse(
-                    text="Thank you!",
+                    text=text,
                     language=target_language,
                     confidence=0.5,
                     context="",
                     alternatives=[]
                 )
+                for text in texts[:num_suggestions]
             ]
 
     async def detect_language(self, text: str) -> str:

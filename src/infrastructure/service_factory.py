@@ -5,7 +5,7 @@ from .services.stt import WhisperSTTService, DeepgramSTTService
 from .services.tts import PiperTTSService, ElevenLabsTTSService
 from .services.speaker_id import PyannoteSpeakerIdentificationService
 from .services.translation import LocalTranslationService, DeepLTranslationService
-from .services.llm import LocalLLMService, OpenAILLMService
+from .services.llm import LocalLLMService, OpenAILLMService, _HAS_LOCAL_LLM
 from ..core.interfaces import (
     ISpeechToTextService,
     ITextToSpeechService,
@@ -96,11 +96,15 @@ class ServiceFactory:
 
         raise ValueError(f"Unknown processing mode: {mode}")
 
-    def create_llm_service(self) -> ILanguageModelService:
+    def create_llm_service(self) -> Optional[ILanguageModelService]:
         """Create LLM service based on configuration."""
         mode = self.settings.processing_mode
 
         if mode == ProcessingMode.LOCAL:
+            if not _HAS_LOCAL_LLM:
+                import warnings
+                warnings.warn("Local LLM service unavailable (llama-cpp-python not installed). LLM features disabled.")
+                return None
             return LocalLLMService(
                 model_path=self.settings.llama_model_path,
                 use_intel_gpu=self.use_intel_gpu
@@ -108,11 +112,13 @@ class ServiceFactory:
 
         elif mode in [ProcessingMode.API_FAST, ProcessingMode.API_PREMIUM]:
             if not self.settings.openai_api_key:
-                # Fallback to local
-                return LocalLLMService(
-                    model_path=self.settings.llama_model_path,
-                    use_intel_gpu=self.use_intel_gpu
-                )
+                # Fallback to local if available
+                if _HAS_LOCAL_LLM:
+                    return LocalLLMService(
+                        model_path=self.settings.llama_model_path,
+                        use_intel_gpu=self.use_intel_gpu
+                    )
+                return None
 
             model = "gpt-4-turbo-preview" if mode == ProcessingMode.API_PREMIUM else "gpt-3.5-turbo"
             return OpenAILLMService(

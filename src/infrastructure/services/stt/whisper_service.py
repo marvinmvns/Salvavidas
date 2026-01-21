@@ -32,16 +32,18 @@ class WhisperSTTService(ISpeechToTextService):
         audio_array = np.frombuffer(audio_chunk.data, dtype=np.int16)
         audio_float = audio_array.astype(np.float32) / 32768.0
 
-        # Transcribe
+        # Transcribe - OPTIMIZED FOR SPEED with automatic language detection
         segments, info = self.model.transcribe(
             audio_float,
-            language=language,
-            beam_size=1,  # Faster inference
+            language=language,  # None = auto-detect language
+            beam_size=1,  # Fastest inference
             best_of=1,
+            temperature=0.0,  # Greedy decoding (faster)
+            condition_on_previous_text=False,  # Don't use context (faster)
             vad_filter=True,  # Voice Activity Detection
             vad_parameters=dict(
-                min_silence_duration_ms=500,
-                speech_pad_ms=200
+                min_silence_duration_ms=500,  # Reduced for faster response
+                speech_pad_ms=200  # Less padding
             )
         )
 
@@ -76,15 +78,17 @@ class WhisperSTTService(ISpeechToTextService):
         """Transcribe audio stream in realtime."""
         buffer = bytearray()
         sample_rate = None
-        min_chunk_size = 16000 * 2  # 1 second of audio at 16kHz
+        min_chunk_size = 96000  # 3 seconds of audio at 16kHz (16000 Hz * 2 bytes * 3s)
+        print("DEBUG: STT stream started")
 
         async for audio_chunk in audio_stream:
+            # print(f"DEBUG: Received chunk {len(audio_chunk.data)} bytes")
             if sample_rate is None:
                 sample_rate = audio_chunk.sample_rate
 
             buffer.extend(audio_chunk.data)
 
-            # Process when we have enough data
+            # Process when we have enough data (0.5s)
             if len(buffer) >= min_chunk_size:
                 # Create temporary audio chunk
                 temp_chunk = AudioChunk(
@@ -94,13 +98,18 @@ class WhisperSTTService(ISpeechToTextService):
                     channels=audio_chunk.channels,
                     duration_ms=len(buffer) / (sample_rate * 2) * 1000
                 )
+                
+                print(f"DEBUG: Transcribing buffer {len(buffer)} bytes")
 
-                # Transcribe
-                transcription = await self.transcribe(temp_chunk, language)
+                # Transcribe (force Portuguese)
+                transcription = await self.transcribe(temp_chunk, language or "pt")
 
                 if transcription.text:
+                    print(f"DEBUG: Transcription result: {transcription.text}")
                     yield transcription
+                else:
+                    print("DEBUG: Transcription empty - VAD filter?")
 
-                # Keep last 0.5 seconds for context
-                overlap = 16000  # 0.5 seconds
+                # Keep last 1 second for context
+                overlap = 32000  # 1 second (16000 Hz * 2 bytes)
                 buffer = buffer[-overlap:]

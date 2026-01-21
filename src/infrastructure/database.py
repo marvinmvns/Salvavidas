@@ -38,7 +38,7 @@ class Database:
             ("latency_priority", "realtime", "str", "performance", "Latency priority: realtime, balanced, quality"),
             ("sample_rate", "16000", "int", "audio", "Audio sample rate"),
             ("enable_streaming", "true", "bool", "features", "Enable audio streaming"),
-            ("use_intel_gpu", "false", "bool", "performance", "Use Intel GPU acceleration for local models"),
+            ("use_intel_gpu", "true", "bool", "performance", "Use Intel GPU acceleration for local models"),
         ]
 
         async with self.SessionLocal() as session:
