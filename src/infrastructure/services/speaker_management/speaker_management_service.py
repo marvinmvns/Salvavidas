@@ -41,7 +41,8 @@ class SpeakerManagementService(ISpeakerManagementService):
         database_path: str = "speakers.db",
         use_pyannote: bool = True,
         pyannote_model: str = "pyannote/embedding",
-        huggingface_token: Optional[str] = None
+        huggingface_token: Optional[str] = None,
+        use_intel_gpu: bool = False
     ):
         """
         Initialize speaker management service.
@@ -51,14 +52,13 @@ class SpeakerManagementService(ISpeakerManagementService):
             use_pyannote: Whether to use Pyannote.audio (recommended for production)
             pyannote_model: Pyannote model name (default: pyannote/embedding)
             huggingface_token: Hugging Face token for gated models
+            use_intel_gpu: Whether to use Intel GPU acceleration
         """
-        self.database_path = database_path
-
         self.database_path = database_path
 
         # Initialize embedding service (SpeechBrain for local)
         try:
-            self.embedding_service = SpeechBrainEmbeddingService()
+            self.embedding_service = SpeechBrainEmbeddingService(use_intel_gpu=use_intel_gpu)
         except Exception as e:
             print(f"[SpeakerMgmt] Failed to load SpeechBrain: {e}")
             from .pyannote_embedding_service import FallbackEmbeddingService
@@ -78,11 +78,16 @@ class SpeakerManagementService(ISpeakerManagementService):
         self.unknown_speaker_count = 0
         self.temporary_speakers: Dict[str, dict] = {}
 
+        # Session cache - keeps last identified speaker to avoid creating duplicates
+        self.last_speaker_id = None
+        self.last_speaker_time = None
+        self.session_cache_seconds = 15  # Keep same speaker for 15 seconds
+
         # Configuration
         self.min_samples_required = 3
         self.max_samples_allowed = 10
-        self.identification_threshold = 0.25  # For enrolled speakers
-        self.temp_speaker_threshold = 0.02  # Very low - embeddings seem to have low similarity
+        self.identification_threshold = 0.55  # For enrolled speakers (55% similarity)
+        self.temp_speaker_threshold = 0.40  # For temporary speakers (40% similarity)
 
     async def start_enrollment(
         self,
@@ -195,6 +200,45 @@ class SpeakerManagementService(ISpeakerManagementService):
         audio_chunk: AudioChunk
     ) -> SpeakerIdentificationResult:
         """Identify speaker from audio or detect new speaker."""
+
+        # SESSION CACHE: If we recently identified a speaker, reuse it
+        # This prevents creating multiple speakers for continuous speech
+        from datetime import timedelta
+        if self.last_speaker_id and self.last_speaker_time:
+            time_since_last = (datetime.now() - self.last_speaker_time).total_seconds()
+            if time_since_last < self.session_cache_seconds:
+                print(f"[SpeakerMgmt] Using cached speaker: {self.last_speaker_id} (last seen {time_since_last:.1f}s ago)")
+
+                # Return cached speaker (enrolled or temporary)
+                if self.last_speaker_id in self.enrolled_speakers:
+                    speaker = self.enrolled_speakers[self.last_speaker_id]
+                    return SpeakerIdentificationResult(
+                        identified=True,
+                        speaker=speaker,
+                        confidence=1.0,
+                        is_new_speaker=False
+                    )
+                elif self.last_speaker_id in self.temporary_speakers:
+                    temp_data = self.temporary_speakers[self.last_speaker_id]
+                    temp_speaker_obj = EnrolledSpeaker(
+                        speaker_id=self.last_speaker_id,
+                        name=self.last_speaker_id,
+                        email=None,
+                        language=temp_data.get("language"),
+                        organization=None,
+                        notes=None,
+                        voice_embedding=None,
+                        sample_count=1,
+                        enrollment_date=temp_data["timestamp"]
+                    )
+                    return SpeakerIdentificationResult(
+                        identified=False,
+                        speaker=temp_speaker_obj,
+                        confidence=0.9,
+                        is_new_speaker=False,
+                        suggested_name=self.last_speaker_id
+                    )
+
         # Generate embedding from audio
         query_embedding = self._generate_voice_embedding([audio_chunk.data])
 
@@ -211,6 +255,10 @@ class SpeakerManagementService(ISpeakerManagementService):
                 "embedding": query_embedding,
                 "timestamp": datetime.now()
             }
+
+            # Update session cache
+            self.last_speaker_id = temp_id
+            self.last_speaker_time = datetime.now()
 
             return SpeakerIdentificationResult(
                 identified=False,
@@ -242,6 +290,10 @@ class SpeakerManagementService(ISpeakerManagementService):
                 (speaker.recognition_accuracy * speaker.total_meetings + best_similarity) /
                 (speaker.total_meetings + 1)
             )
+
+            # Update session cache
+            self.last_speaker_id = best_match_id
+            self.last_speaker_time = datetime.now()
 
             return SpeakerIdentificationResult(
                 identified=True,
@@ -281,6 +333,10 @@ class SpeakerManagementService(ISpeakerManagementService):
                     enrollment_date=temp_data["timestamp"]
                 )
 
+                # Update session cache
+                self.last_speaker_id = best_temp_match
+                self.last_speaker_time = datetime.now()
+
                 return SpeakerIdentificationResult(
                     identified=False,
                     speaker=temp_speaker_obj, # Pass object so UseCase can see language
@@ -298,6 +354,10 @@ class SpeakerManagementService(ISpeakerManagementService):
                 "embedding": query_embedding,
                 "timestamp": datetime.now()
             }
+
+            # Update session cache
+            self.last_speaker_id = temp_id
+            self.last_speaker_time = datetime.now()
 
             return SpeakerIdentificationResult(
                 identified=False,

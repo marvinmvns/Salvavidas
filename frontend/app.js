@@ -258,18 +258,20 @@ function updateLatencyMonitor(performance) {
 
             // Color code based on latency thresholds
             element.className = 'latency-value';
-            if (value > 1000) {
+            if (value > 2000) {
                 element.classList.add('critical');
-            } else if (value > 500) {
+            } else if (value > 1000) {
                 element.classList.add('warning');
             }
         }
     };
 
-    updateLatency('latency-stt', performance.stt_latency_ms);
-    updateLatency('latency-speaker', performance.speaker_latency_ms);
-    updateLatency('latency-translation', performance.translation_latency_ms);
-    updateLatency('latency-total', performance.total_latency_ms);
+    // Use new detailed metrics (with fallback to legacy names)
+    updateLatency('latency-speaker', performance.speaker_id_ms || performance.speaker_latency_ms || 0);
+    updateLatency('latency-stt', performance.stt_ms || performance.stt_latency_ms || 0);
+    updateLatency('latency-translation', performance.translation_ms || performance.translation_latency_ms || 0);
+    updateLatency('latency-llm', performance.llm_ms || 0);
+    updateLatency('latency-total', performance.total_ms || performance.total_latency_ms || 0);
 }
 
 // Show modal to name a new speaker
@@ -323,6 +325,12 @@ function showNameSpeakerModal(speakerData) {
     document.getElementById('speaker-name-input').value = speakerData.suggested_name || '';
     document.getElementById('speaker-email-input').value = '';
 
+    // Set language if known
+    const langSelect = document.getElementById('speaker-language-input');
+    if (langSelect) {
+        langSelect.value = speakerData.language || '';
+    }
+
     // Store speaker ID for later use
     modal.dataset.speakerId = speakerData.speaker_id;
 
@@ -349,6 +357,7 @@ async function submitSpeakerName() {
     const speakerId = modal.dataset.speakerId;
     const name = document.getElementById('speaker-name-input').value.trim();
     const email = document.getElementById('speaker-email-input').value.trim();
+    const language = document.getElementById('speaker-language-input') ? document.getElementById('speaker-language-input').value : null;
 
     if (!name) {
         alert('Por favor, digite um nome para o falante.');
@@ -362,7 +371,8 @@ async function submitSpeakerName() {
             body: JSON.stringify({
                 speaker_id: speakerId,
                 name: name,
-                email: email || null
+                email: email || null,
+                language: language || null
             })
         });
 

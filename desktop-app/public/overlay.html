@@ -494,12 +494,20 @@
                 <span class="latency-value" id="lat-stt">--ms</span>
             </div>
             <div class="latency-item">
+                <span>Translation:</span>
+                <span class="latency-value" id="lat-translation">--ms</span>
+            </div>
+            <div class="latency-item">
                 <span>Speaker:</span>
                 <span class="latency-value" id="lat-speaker">--ms</span>
             </div>
             <div class="latency-item">
-                <span>Total:</span>
-                <span class="latency-value" id="lat-total">--ms</span>
+                <span>LLM:</span>
+                <span class="latency-value" id="lat-llm">--ms</span>
+            </div>
+            <div class="latency-item" style="margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 5px;">
+                <span style="font-weight: 700;">TOTAL:</span>
+                <span class="latency-value" id="lat-total" style="font-weight: 700;">--ms</span>
             </div>
         </div>
 
@@ -719,14 +727,17 @@
                 if (el) {
                     el.textContent = `${value}ms`;
                     el.className = 'latency-value';
-                    if (value > 1000) el.classList.add('critical');
-                    else if (value > 500) el.classList.add('warning');
+                    if (value > 2000) el.classList.add('critical');
+                    else if (value > 1000) el.classList.add('warning');
                 }
             };
 
-            update('lat-stt', perf.stt_latency_ms);
-            update('lat-speaker', perf.speaker_latency_ms);
-            update('lat-total', perf.total_latency_ms);
+            // Use new detailed metrics (with fallback to legacy names)
+            update('lat-stt', perf.stt_ms || perf.stt_latency_ms || 0);
+            update('lat-translation', perf.translation_ms || perf.translation_latency_ms || 0);
+            update('lat-speaker', perf.speaker_id_ms || perf.speaker_latency_ms || 0);
+            update('lat-llm', perf.llm_ms || 0);
+            update('lat-total', perf.total_ms || perf.total_latency_ms || 0);
         }
 
         function displaySuggestions(suggestions) {

@@ -104,7 +104,11 @@ class AudioClient {
             }
         }
 
+        // Store reference for callback (before creating audioCapture)
+        window.audioClient = this;
+
         // Create simple audio capture manager
+        const audioClientInstance = this;
         this.audioCapture = {
             audioContext,
             micStream,
@@ -161,7 +165,7 @@ class AudioClient {
                 this.processorNode = processorNode;
                 this.onAudioDataCallback = (buffer) => {
                     if (this.isCapturing) {
-                        window.audioClient.sendAudioData(buffer);
+                        audioClientInstance.sendAudioData(buffer);
                     }
                 };
             },
@@ -202,9 +206,6 @@ class AudioClient {
                 };
             }
         };
-
-        // Store reference for callback
-        window.audioClient = this;
     }
 
     /**

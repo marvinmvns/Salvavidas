@@ -131,8 +131,8 @@
 
                 <div class="stat-row">
                     <div class="stat-item">
-                        <div class="stat-value" id="latency-total" style="color: #00C853;">--ms</div>
-                        <div class="stat-label">Latency</div>
+                        <div class="stat-value" id="latency-total" style="color: #00C853; font-weight: 700;">--ms</div>
+                        <div class="stat-label">TOTAL</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" style="color: var(--accent-yellow);">Local</div>
@@ -140,7 +140,26 @@
                     </div>
                 </div>
 
-                <div class="stat-row" style="margin-top: 20px;">
+                <div class="stat-row" style="margin-top: 15px; font-size: 0.85rem;">
+                    <div class="stat-item">
+                        <div class="stat-value" id="latency-stt" style="font-size: 0.9rem;">--ms</div>
+                        <div class="stat-label" style="font-size: 0.75rem;">STT</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="latency-translation" style="font-size: 0.9rem;">--ms</div>
+                        <div class="stat-label" style="font-size: 0.75rem;">Translation</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="latency-speaker" style="font-size: 0.9rem;">--ms</div>
+                        <div class="stat-label" style="font-size: 0.75rem;">Speaker</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="latency-llm" style="font-size: 0.9rem;">--ms</div>
+                        <div class="stat-label" style="font-size: 0.75rem;">LLM</div>
+                    </div>
+                </div>
+
+                <div class="stat-row" style="margin-top: 15px;">
                     <div class="stat-item">
                         <div class="stat-value">Active</div>
                         <div class="stat-label">Mic Status</div>

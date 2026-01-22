@@ -10,7 +10,7 @@ from ..entities import (
 )
 from ..interfaces import (
     ISpeechToTextService,
-    ISpeakerIdentificationService,
+    ISpeakerManagementService,
     ITranslationService,
     ILanguageModelService,
 )
@@ -22,7 +22,7 @@ class ProcessVoiceTranslationUseCase:
     def __init__(
         self,
         stt_service: ISpeechToTextService,
-        speaker_id_service: ISpeakerIdentificationService,
+        speaker_id_service: ISpeakerManagementService,
         translation_service: ITranslationService,
         llm_service: ILanguageModelService,
         target_language: str,
@@ -37,7 +37,6 @@ class ProcessVoiceTranslationUseCase:
         self.target_language = target_language
         self.enable_speaker_id = enable_speaker_id
         self.enable_suggestions = enable_suggestions
-        self.known_speakers: List[Speaker] = []
         self.conversation_history: List[str] = []
 
     async def execute(
@@ -46,20 +45,30 @@ class ProcessVoiceTranslationUseCase:
         source_language: Optional[str] = None
     ) -> ConversationTurn:
         """Execute the use case for a single audio chunk."""
+        import time
+
         print(f"[UseCase] === Starting audio processing ===")
         print(f"[UseCase] Audio chunk: {len(audio_chunk.data)} bytes, source_lang: {source_language}")
 
+        # Performance tracking
+        perf = {}
+        start_total = time.time()
+
         # Step 1: Identify speaker (if enabled)
+        start_speaker = time.time()
         speaker = await self._identify_speaker(audio_chunk)
-        print(f"[UseCase] Speaker identified: {speaker.speaker_id}")
+        perf['speaker_id_ms'] = int((time.time() - start_speaker) * 1000)
+        print(f"[UseCase] Speaker identified: {speaker.speaker_id} ({perf['speaker_id_ms']}ms)")
 
         # Step 2: Transcribe audio
+        start_stt = time.time()
         transcription = await self.stt_service.transcribe(
             audio_chunk,
             language=source_language or speaker.language
         )
+        perf['stt_ms'] = int((time.time() - start_stt) * 1000)
         transcription.speaker = speaker
-        print(f"[UseCase] Transcription: '{transcription.text}' (lang: {transcription.language})")
+        print(f"[UseCase] Transcription: '{transcription.text}' (lang: {transcription.language}) ({perf['stt_ms']}ms)")
 
         # Step 3: Use Whisper's detected language (more accurate than langdetect for short texts)
         if not source_language:
@@ -83,17 +92,21 @@ class ProcessVoiceTranslationUseCase:
                     print(f"[UseCase] Failed to update speaker language: {e}")
 
         # Step 4: Translate to target language
+        start_translation = time.time()
         print(f"[UseCase] Translating: '{transcription.text}' from {source_language} to {self.target_language}")
         translation = await self.translation_service.translate(
             text=transcription.text,
             source_language=source_language,
             target_language=self.target_language
         )
-        print(f"[UseCase] Translation result: '{translation.translated_text}'")
+        perf['translation_ms'] = int((time.time() - start_translation) * 1000)
+        print(f"[UseCase] Translation result: '{translation.translated_text}' ({perf['translation_ms']}ms)")
 
         # Step 5: Generate suggestions (if enabled)
         suggestions = []
+        perf['llm_ms'] = 0
         if self.enable_suggestions and transcription.text:
+            start_llm = time.time()
             print(f"[UseCase] Generating suggestions...")
             # Note: This adds latency. Ideally should be async/background.
             try:
@@ -103,20 +116,32 @@ class ProcessVoiceTranslationUseCase:
                     target_language=source_language,
                     num_suggestions=3
                 )
-                print(f"[UseCase] Generated {len(suggestions)} suggestions")
+                perf['llm_ms'] = int((time.time() - start_llm) * 1000)
+                print(f"[UseCase] Generated {len(suggestions)} suggestions ({perf['llm_ms']}ms)")
             except Exception as e:
                 print(f"[UseCase] Error generating suggestions: {e}")
 
         # Update conversation history
         self.conversation_history.append(f"{speaker.speaker_id}: {transcription.text}")
 
+        # Calculate total
+        perf['total_ms'] = int((time.time() - start_total) * 1000)
+
+        # Log detailed performance
+        print(f"[PERF] Speaker: {perf['speaker_id_ms']}ms | STT: {perf['stt_ms']}ms | Translation: {perf['translation_ms']}ms | LLM: {perf['llm_ms']}ms | TOTAL: {perf['total_ms']}ms")
+
         # Create conversation turn
-        return ConversationTurn(
+        turn = ConversationTurn(
             transcription=transcription,
             translation=translation,
             suggestions=suggestions,
             timestamp=datetime.now()
         )
+
+        # Attach performance metrics to the turn (add as attribute)
+        turn.performance = perf
+
+        return turn
 
     async def execute_stream(
         self,
@@ -171,33 +196,53 @@ class ProcessVoiceTranslationUseCase:
             )
 
     async def _identify_speaker(self, audio_chunk: AudioChunk) -> Speaker:
-        """Identify or enroll speaker."""
+        """Identify speaker using modern SpeakerManagementService."""
         if not self.enable_speaker_id:
             return Speaker(speaker_id="default", confidence=1.0)
 
         try:
-            speaker = await self.speaker_id_service.identify_speaker(
-                audio_chunk,
-                self.known_speakers
-            )
+            # Use new API - returns SpeakerIdentificationResult
+            result = await self.speaker_id_service.identify_speaker(audio_chunk)
 
-            # If confidence is low, this might be a new speaker
-            if speaker.confidence < 0.6:
-                new_speaker = await self.speaker_id_service.enroll_speaker(
-                    [audio_chunk]
+            # Convert result to Speaker entity
+            if result.identified and result.speaker:
+                # Enrolled speaker recognized
+                return Speaker(
+                    speaker_id=result.speaker.speaker_id,
+                    name=result.speaker.name,
+                    language=result.speaker.language,
+                    confidence=result.confidence,
+                    embedding=result.speaker.voice_embedding
                 )
-                self.known_speakers.append(new_speaker)
-                return new_speaker
-
-            return speaker
-        except Exception:
+            elif result.speaker:
+                # Temporary speaker (matched existing temp)
+                return Speaker(
+                    speaker_id=result.speaker.speaker_id,
+                    name=result.speaker.name or result.suggested_name,
+                    language=result.speaker.language,
+                    confidence=result.confidence,
+                    embedding=None
+                )
+            else:
+                # New temporary speaker
+                return Speaker(
+                    speaker_id=result.suggested_name or "Unknown",
+                    name=result.suggested_name,
+                    language=None,
+                    confidence=result.confidence,
+                    embedding=None
+                )
+        except Exception as e:
+            print(f"[UseCase] Error identifying speaker: {e}")
+            import traceback
+            traceback.print_exc()
             # Fallback to default speaker
             return Speaker(speaker_id="default", confidence=0.0)
 
     def add_known_speaker(self, speaker: Speaker) -> None:
-        """Add a known speaker to the list."""
-        if speaker not in self.known_speakers:
-            self.known_speakers.append(speaker)
+        """Add a known speaker - deprecated with new speaker management."""
+        # No-op: SpeakerManagementService handles this internally
+        pass
 
     def clear_conversation_history(self) -> None:
         """Clear conversation history."""

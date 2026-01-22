@@ -9,8 +9,18 @@ from typing import List
 class SpeechBrainEmbeddingService:
     """Speaker ID using SpeechBrain ECAPA-VoxCeleb."""
 
-    def __init__(self, model_path: str = "/app/data/models/speechbrain", device: str = "cpu"):
-        self.device = device
+    def __init__(self, model_path: str = "/app/data/models/speechbrain", device: str = "cpu", use_intel_gpu: bool = False):
+        # Try Intel GPU first if requested
+        if use_intel_gpu:
+            try:
+                import intel_extension_for_pytorch as ipex
+                self.device = "xpu"
+                print("[SpeechBrain] Using Intel XPU (GPU) acceleration!")
+            except Exception as e:
+                print(f"[SpeechBrain] Intel GPU not available: {e}, falling back to CPU")
+                self.device = device
+        else:
+            self.device = device
         
         # Load from local folder
         # 'source' can be a path. But we need to ensure it doesn't try to connect to HF.

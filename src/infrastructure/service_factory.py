@@ -3,13 +3,13 @@ from typing import Optional
 from config.settings import Settings, ProcessingMode
 from .services.stt import WhisperSTTService, DeepgramSTTService
 from .services.tts import PiperTTSService, ElevenLabsTTSService
-from .services.speaker_id import PyannoteSpeakerIdentificationService
+from .services.speaker_management import SpeakerManagementService
 from .services.translation import LocalTranslationService, DeepLTranslationService
 from .services.llm import LocalLLMService, OpenAILLMService, _HAS_LOCAL_LLM
 from ..core.interfaces import (
     ISpeechToTextService,
     ITextToSpeechService,
-    ISpeakerIdentificationService,
+    ISpeakerManagementService,
     ITranslationService,
     ILanguageModelService,
 )
@@ -29,17 +29,21 @@ class ServiceFactory:
 
         if mode == ProcessingMode.LOCAL:
             # Use Intel GPU acceleration if available
-            device = "cpu"
             if self.use_intel_gpu:
                 try:
-                    import intel_extension_for_pytorch as ipex
-                    device = "xpu"  # Intel GPU device
-                except ImportError:
-                    pass
-
+                    from .services.stt.intel_whisper_service import IntelWhisperSTTService
+                    return IntelWhisperSTTService(
+                        model_size=self.settings.whisper_model,
+                        device="xpu"
+                    )
+                except Exception as e:
+                    print(f"[ServiceFactory] Failed to initialize Intel Whisper: {e}. Falling back to standard Whisper.")
+                    # Fallback to standard
+            
+            # Standard Faster-Whisper (CPU optimized)
             return WhisperSTTService(
                 model_size=self.settings.whisper_model,
-                device=device
+                device="cpu"
             )
 
         elif mode in [ProcessingMode.API_FAST, ProcessingMode.API_PREMIUM]:
@@ -73,10 +77,10 @@ class ServiceFactory:
 
         raise ValueError(f"Unknown processing mode: {mode}")
 
-    def create_speaker_id_service(self) -> ISpeakerIdentificationService:
-        """Create Speaker ID service."""
-        # Always use local for now (pyannote is very good)
-        return PyannoteSpeakerIdentificationService()
+    def create_speaker_id_service(self) -> ISpeakerManagementService:
+        """Create Speaker ID service (using modern SpeakerManagementService)."""
+        # Use SpeechBrain-based speaker management with proper embeddings + Intel GPU
+        return SpeakerManagementService(use_intel_gpu=self.use_intel_gpu)
 
     def create_translation_service(self) -> ITranslationService:
         """Create Translation service based on configuration."""

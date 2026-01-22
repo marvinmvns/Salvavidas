@@ -14,13 +14,34 @@ class WhisperSTTService(ISpeechToTextService):
     """Local Whisper STT service for low-latency transcription."""
 
     def __init__(self, model_size: str = "large-v3", device: str = "cpu"):
-        """Initialize Whisper model (using v3-turbo by default)."""
-        self.model = WhisperModel(
-            model_size,
-            device=device,
-            compute_type="int8" if device == "cpu" else "float16"
-        )
+        """Initialize Whisper model (using faster-whisper)."""
+        compute_type = "int8"
+        
+        # CTranslate2 usually supports 'cpu' and 'cuda'. 'xpu' might not be supported.
+        if device not in ["cpu", "cuda", "auto"]:
+            print(f"[WhisperSTT] Device '{device}' might not be supported by faster-whisper. Falling back to 'cpu'.")
+            device = "cpu"
+            
+        if device == "cuda":
+            compute_type = "float16"
+
+        print(f"[WhisperSTT] Loading faster-whisper model '{model_size}' on {device} ({compute_type})...")
+        try:
+            self.model = WhisperModel(
+                model_size,
+                device=device,
+                compute_type=compute_type
+            )
+        except Exception as e:
+            print(f"[WhisperSTT] Error loading on {device}: {e}. Falling back to CPU/int8.")
+            self.model = WhisperModel(
+                model_size,
+                device="cpu",
+                compute_type="int8"
+            )
+        
         self.model_size = model_size
+        print(f"[WhisperSTT] Model loaded successfully.")
 
     async def transcribe(
         self,

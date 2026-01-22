@@ -397,19 +397,29 @@ async def websocket_voice_translation(websocket: WebSocket):
 
         # Audio buffer for accumulating chunks (process larger chunks = less overhead)
         audio_buffer = bytearray()
-        
-        # SMART BUFFERING CONFIG
-        MIN_BUFFER_SIZE = 16000     # ~0.5s minimum to process
-        MAX_BUFFER_SIZE = 240000    # ~7.5s max (force process if too long)
-        SILENCE_THRESHOLD = 500     # RMS amplitude threshold for silence (adjust if needed)
-        PAUSE_CHUNKS_REQUIRED = 2   # Number of silent chunks required to trigger processing
+
+        # BALANCED CONFIG (optimal for Whisper)
+        MIN_BUFFER_SIZE = 32000     # ~1s minimum (Whisper needs at least 1s)
+        MAX_BUFFER_SIZE = 64000     # ~2s max (responsive but enough for Whisper)
+        SILENCE_THRESHOLD = 400     # RMS threshold for silence detection
+        PAUSE_CHUNKS_REQUIRED = 2   # Wait 2 silent chunks before processing
         
         silence_counter = 0
 
         # Process audio stream
         while True:
-            # Receive audio data
-            message = await websocket.receive()
+            try:
+                # Receive audio data
+                message = await websocket.receive()
+            except RuntimeError as e:
+                # WebSocket already disconnected
+                print(f"[WebSocket] Connection closed: {e}")
+                break
+
+            # Check for disconnect message
+            if message.get("type") == "websocket.disconnect":
+                print("[WebSocket] Received disconnect signal")
+                break
 
             if "bytes" in message:
                 # Binary audio data - add to buffer
@@ -452,136 +462,176 @@ async def websocket_voice_translation(websocket: WebSocket):
                 # Take data from buffer
                 # Reset silence counter after processing
                 silence_counter = 0
-                
+
                 process_size = len(audio_buffer) # Process everything collected
                 audio_data = bytes(audio_buffer[:process_size])
                 audio_buffer = bytearray()  # Clear buffer
-                
-                # Create audio chunk (rest of the code...)
-                audio_chunk = AudioChunk(
-                    data=audio_data,
-                    timestamp=datetime.now(),
-                    sample_rate=settings.sample_rate,
-                    channels=settings.channels,
-                    duration_ms=len(audio_data) / (settings.sample_rate * 2) * 1000
-                )
 
-                # Track latencies for performance monitoring
-                import time
-                start_time = time.time()
+                # Check if audio has enough energy (not just silence/noise)
+                import numpy as np
+                full_chunk_array = np.frombuffer(audio_data, dtype=np.int16)
+                if len(full_chunk_array) > 0:
+                    chunk_rms = np.sqrt(np.mean(full_chunk_array.astype(float)**2))
+                    # Skip processing if audio is too quiet (just noise)
+                    if chunk_rms < 200:  # Threshold for meaningful audio
+                        print(f"[WebSocket] Skipping silent chunk (RMS: {chunk_rms:.1f})")
+                        continue
 
-                # Identify speaker (if enabled in settings)
-                speaker_result = None
-                speaker_latency_ms = 0
-
-                if settings.enable_speaker_id:
-                     # Throttling: only identify every 4th chunk to save CPU
-                    if not hasattr(websocket, "chunk_count"):
-                        websocket.chunk_count = 0
-                    websocket.chunk_count += 1
-
-                    if websocket.chunk_count % 4 == 0:
-                        try:
-                            speaker_start = time.time()
-                            speaker_result = await speaker_service.identify_speaker(audio_chunk)
-                            speaker_latency_ms = int((time.time() - speaker_start) * 1000)
-                        except Exception as e:
-                            print(f"[WebAPI] Speaker ID error: {e}")
-
-                # Fallback if disabled or throttled
-                if not speaker_result:
-                    from ...core.entities.speaker_management import SpeakerIdentificationResult
-                    speaker_result = SpeakerIdentificationResult(
-                        identified=False, speaker=None, confidence=0.0, 
-                        is_new_speaker=False, suggested_name="Speaker 1"
+                # === PROCESS AUDIO (wrapped in try-catch for robustness) ===
+                try:
+                    # Create audio chunk
+                    audio_chunk = AudioChunk(
+                        data=audio_data,
+                        timestamp=datetime.now(),
+                        sample_rate=settings.sample_rate,
+                        channels=settings.channels,
+                        duration_ms=len(audio_data) / (settings.sample_rate * 2) * 1000
                     )
 
+                    # Track latencies for performance monitoring
+                    import time
+                    start_time = time.time()
 
-                # Process translation
-                stt_start = time.time()
-                # Sanitize source language
-                source_lang = settings.source_language
-                if source_lang in ["auto", ""]:
-                    source_lang = None
+                    # Identify speaker (if enabled in settings)
+                    speaker_result = None
+                    speaker_latency_ms = 0
 
-                conversation_turn = await controller.process_audio(
-                    audio_chunk,
-                    source_language=source_lang
-                )
-                stt_latency_ms = int((time.time() - stt_start) * 1000)
+                    if settings.enable_speaker_id:
+                        # Throttling: only identify every 4th chunk to save CPU
+                        if not hasattr(websocket, "chunk_count"):
+                            websocket.chunk_count = 0
+                        websocket.chunk_count += 1
 
-                # Translation latency (approximate from transcription data)
-                translation_latency_ms = int(stt_latency_ms * 0.3)  # Translation is ~30% of STT time
+                        if websocket.chunk_count % 4 == 0:
+                            try:
+                                speaker_start = time.time()
+                                speaker_result = await speaker_service.identify_speaker(audio_chunk)
+                                speaker_latency_ms = int((time.time() - speaker_start) * 1000)
+                            except Exception as e:
+                                print(f"[WebAPI] Speaker ID error: {e}")
 
-                total_latency_ms = int((time.time() - start_time) * 1000)
+                    # Fallback if disabled or throttled
+                    if not speaker_result:
+                        from ...core.entities.speaker_management import SpeakerIdentificationResult
+                        speaker_result = SpeakerIdentificationResult(
+                            identified=False, speaker=None, confidence=0.0,
+                            is_new_speaker=False, suggested_name="Speaker 1"
+                        )
 
-                # Use identified speaker if available, otherwise use fallback
-                if speaker_result.identified and speaker_result.speaker:
-                    identified_speaker = speaker_result.speaker
-                    speaker_confidence = speaker_result.confidence
 
-                    # Update speaker stats
-                    await speaker_service.update_speaker_stats(
-                        identified_speaker.speaker_id,
-                        talk_time_seconds=audio_chunk.duration_ms / 1000
+                    # Process translation (Use Case measures internally)
+                    # Sanitize source language
+                    source_lang = settings.source_language
+                    if source_lang in ["auto", ""]:
+                        source_lang = None
+
+                    conversation_turn = await controller.process_audio(
+                        audio_chunk,
+                        source_language=source_lang
                     )
-                else:
-                    # Unknown speaker
-                    identified_speaker = None
-                    speaker_confidence = 0.0
 
-                    # Only notify frontend when we actually detected a NEW speaker
-                    # (not on dummy results from throttled chunks)
-                    if speaker_result.is_new_speaker and speaker_result.suggested_name:
-                        await websocket.send_json({
-                            "type": "new_speaker_detected",
-                            "speaker_id": speaker_result.suggested_name,
-                            "suggested_name": speaker_result.suggested_name,
-                            "confidence": speaker_confidence,
-                            "message": "Novo falante detectado. Por favor, identifique."
-                        })
+                    # Get detailed performance metrics from use case
+                    if hasattr(conversation_turn, 'performance'):
+                        perf = conversation_turn.performance
+                        speaker_latency_ms = perf.get('speaker_id_ms', 0)
+                        stt_latency_ms = perf.get('stt_ms', 0)
+                        translation_latency_ms = perf.get('translation_ms', 0)
+                        llm_latency_ms = perf.get('llm_ms', 0)
+                        total_latency_ms = perf.get('total_ms', 0)
+                    else:
+                        # Fallback if performance not available
+                        total_latency_ms = int((time.time() - start_time) * 1000)
+                        stt_latency_ms = total_latency_ms
+                        translation_latency_ms = 0
+                        llm_latency_ms = 0
 
-                # Record analytics
-                await analytics_service.record_transcription(
-                    meeting_id=meeting_id,
-                    transcription=conversation_turn.transcription,
-                    speaker=identified_speaker
-                )
+                    # Use identified speaker if available, otherwise use fallback
+                    if speaker_result.identified and speaker_result.speaker:
+                        identified_speaker = speaker_result.speaker
+                        speaker_confidence = speaker_result.confidence
 
-                # Only send results if there's actual transcribed text
-                if conversation_turn.transcription.text and conversation_turn.transcription.text.strip():
-                    # Send result with speaker identification and performance metrics
-                    result = {
-                        "type": "transcription",
-                        "speaker_id": identified_speaker.speaker_id if identified_speaker else "unknown",
-                        "speaker_name": identified_speaker.name if identified_speaker else speaker_result.suggested_name,
-                        "speaker_email": identified_speaker.email if identified_speaker else None,
-                        "speaker_language": conversation_turn.transcription.language,
-                        "speaker_confidence": speaker_confidence,
-                        "is_enrolled_speaker": speaker_result.identified,
-                        "is_new_speaker": speaker_result.is_new_speaker,
-                        "original_text": conversation_turn.transcription.text,
-                        "translated_text": conversation_turn.translation.translated_text,
-                        "source_language": conversation_turn.translation.source_language,
-                        "target_language": conversation_turn.translation.target_language,
-                        "suggestions": [
-                            {
-                                "text": s.text,
-                                "language": s.language,
-                                "confidence": s.confidence
+                        # Update speaker stats
+                        await speaker_service.update_speaker_stats(
+                            identified_speaker.speaker_id,
+                            talk_time_seconds=audio_chunk.duration_ms / 1000
+                        )
+                    else:
+                        # Unknown speaker
+                        identified_speaker = None
+                        speaker_confidence = 0.0
+
+                        # Only notify frontend when we actually detected a NEW speaker
+                        # (not on dummy results from throttled chunks)
+                        if speaker_result.is_new_speaker and speaker_result.suggested_name:
+                            await websocket.send_json({
+                                "type": "new_speaker_detected",
+                                "speaker_id": speaker_result.suggested_name,
+                                "suggested_name": speaker_result.suggested_name,
+                                "confidence": speaker_confidence,
+                                "message": "Novo falante detectado. Por favor, identifique."
+                            })
+
+                    # Record analytics
+                    await analytics_service.record_transcription(
+                        meeting_id=meeting_id,
+                        transcription=conversation_turn.transcription,
+                        speaker=identified_speaker
+                    )
+
+                    # Only send results if there's actual transcribed text
+                    if conversation_turn.transcription.text and conversation_turn.transcription.text.strip():
+                        # Send result with speaker identification and performance metrics
+                        result = {
+                            "type": "transcription",
+                            "speaker_id": identified_speaker.speaker_id if identified_speaker else "unknown",
+                            "speaker_name": identified_speaker.name if identified_speaker else speaker_result.suggested_name,
+                            "speaker_email": identified_speaker.email if identified_speaker else None,
+                            "speaker_language": conversation_turn.transcription.language,
+                            "speaker_confidence": speaker_confidence,
+                            "is_enrolled_speaker": speaker_result.identified,
+                            "is_new_speaker": speaker_result.is_new_speaker,
+                            "original_text": conversation_turn.transcription.text,
+                            "translated_text": conversation_turn.translation.translated_text,
+                            "source_language": conversation_turn.translation.source_language,
+                            "target_language": conversation_turn.translation.target_language,
+                            "suggestions": [
+                                {
+                                    "text": s.text,
+                                    "language": s.language,
+                                    "confidence": s.confidence
+                                }
+                                for s in conversation_turn.suggestions
+                            ],
+                            "timestamp": conversation_turn.timestamp.isoformat(),
+                            "performance": {
+                                "speaker_id_ms": speaker_latency_ms,
+                                "stt_ms": stt_latency_ms,
+                                "translation_ms": translation_latency_ms,
+                                "llm_ms": llm_latency_ms,
+                                "total_ms": total_latency_ms,
+                                # Legacy fields for backward compatibility
+                                "stt_latency_ms": stt_latency_ms,
+                                "speaker_latency_ms": speaker_latency_ms,
+                                "translation_latency_ms": translation_latency_ms,
+                                "total_latency_ms": total_latency_ms
                             }
-                            for s in conversation_turn.suggestions
-                        ],
-                        "timestamp": conversation_turn.timestamp.isoformat(),
-                        "performance": {
-                            "stt_latency_ms": stt_latency_ms,
-                            "speaker_latency_ms": speaker_latency_ms,
-                            "translation_latency_ms": translation_latency_ms,
-                            "total_latency_ms": total_latency_ms
                         }
-                    }
 
-                    await websocket.send_json(result)
+                        await websocket.send_json(result)
+
+                except Exception as audio_error:
+                    # Log error but continue processing (don't crash the WebSocket)
+                    print(f"[WebSocket] Error processing audio chunk: {audio_error}")
+                    import traceback
+                    traceback.print_exc()
+                    # Optionally send error to client
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Processing error: {str(audio_error)}"
+                        })
+                    except:
+                        pass  # If we can't send error, just continue
 
             elif "text" in message:
                 # Control messages
