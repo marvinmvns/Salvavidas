@@ -5,6 +5,25 @@ let audioContext = null;
 let isRecording = false;
 let audioChunks = [];
 
+// Window controls (for Electron frameless window)
+function minimizeWindow() {
+    if (window.electronAPI && window.electronAPI.minimizeWindow) {
+        window.electronAPI.minimizeWindow();
+    }
+}
+
+function closeWindow() {
+    if (window.electronAPI && window.electronAPI.closeWindow) {
+        window.electronAPI.closeWindow();
+    }
+}
+
+function openSettingsWindow() {
+    if (window.electronAPI && window.electronAPI.openSettings) {
+        window.electronAPI.openSettings();
+    }
+}
+
 // Language flags
 const languageFlags = {
     'en': '🇺🇸',
@@ -22,8 +41,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadConfig();
     await loadSpeakers();
     await loadAudioDevices();
+    await loadSystemStatus();
     connectWebSocket();
+
+    // Refresh GPU status periodically
+    setInterval(loadSystemStatus, 30000);
 });
+
+// Load system status (GPU, active processes)
+async function loadSystemStatus() {
+    try {
+        const response = await fetch('/api/system/status');
+        const status = await response.json();
+
+        document.getElementById('gpu-device').textContent = status.gpu_device;
+        document.getElementById('gpu-processes').textContent =
+            status.active_processes.length > 0
+                ? status.active_processes.join(', ')
+                : 'No active AI processes';
+
+        // Update icon and color based on GPU status
+        const badge = document.getElementById('gpu-status-badge');
+        const icon = document.getElementById('gpu-icon');
+        if (status.gpu_enabled) {
+            badge.style.background = 'linear-gradient(135deg, #1a3a2a, #1a2a3a)';
+            document.getElementById('gpu-device').style.color = '#4ade80';
+            icon.textContent = '🚀';
+        } else {
+            badge.style.background = '#1a1a2e';
+            document.getElementById('gpu-device').style.color = '#888';
+            icon.textContent = '💻';
+        }
+    } catch (error) {
+        console.error('Error loading system status:', error);
+    }
+}
+
+// Load preset prompt
+async function loadPresetPrompt(presetId) {
+    try {
+        const response = await fetch(`/api/prompts/${presetId}`);
+        const preset = await response.json();
+        document.getElementById('translation_prompt').value = preset.prompt;
+    } catch (error) {
+        console.error('Error loading preset:', error);
+    }
+}
 
 // Load audio input devices
 async function loadAudioDevices() {

@@ -41,6 +41,12 @@ function createMainWindow() {
         height: 800,
         minWidth: 800,
         minHeight: 600,
+        frame: false, // Remove window frame/borders
+        titleBarStyle: 'hiddenInset', // macOS: hidden title bar with traffic lights inset
+        titleBarOverlay: {
+            color: '#1a1a2e',
+            symbolColor: '#ffffff'
+        },
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -48,7 +54,7 @@ function createMainWindow() {
         },
         icon: path.join(__dirname, '../build/icon.png'),
         title: 'Salvavidas - Voice Translation Assistant',
-        backgroundColor: '#667eea',
+        backgroundColor: '#1a1a2e',
         show: false, // Don't show until ready
     });
 
@@ -149,6 +155,12 @@ function createSettingsWindow() {
         icon: path.join(__dirname, '../build/icon.png'),
         title: 'Configurações - Salvavidas',
         backgroundColor: '#1a202c',
+        frame: false, // Frameless for custom UI
+        titleBarStyle: 'hiddenInset',
+        titleBarOverlay: {
+            color: '#1a202c',
+            symbolColor: '#ffffff'
+        },
         parent: mainWindow,
         modal: false,
         show: false,
@@ -477,6 +489,18 @@ ipcMain.handle('set-config', (event, key, value) => {
 
 ipcMain.handle('toggle-overlay', toggleOverlay);
 ipcMain.handle('toggle-invisible', toggleInvisibleMode);
+ipcMain.handle('open-settings-window', createSettingsWindow);
+
+// Window controls for any frameless window
+ipcMain.handle('window-minimize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.minimize();
+});
+
+ipcMain.handle('window-close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.close();
+});
 
 // Teams detection IPC handlers
 ipcMain.handle('get-teams-status', async () => {

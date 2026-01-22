@@ -42,39 +42,44 @@ body {
 /* Layout */
 .app-container {
     display: grid;
-    grid-template-columns: 280px 1fr 300px;
+    grid-template-columns: 260px 1fr 260px;
     /* Sidebar | Main | Stats */
     width: 100%;
     height: 100%;
-    padding: 20px;
-    gap: 20px;
+    padding: 15px;
+    gap: 15px;
 }
 
 /* Sidebar (Left) - Navigation & Settings */
 .sidebar-left {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
+    height: 100%;
+    overflow: hidden;
+    /* Ensure flex child scroll works */
 }
 
 .logo-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px;
+    padding: 5px 10px;
 }
 
 .logo-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
     border-radius: 50%;
 }
 
 .logo-text {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 700;
     background: linear-gradient(to right, #fff, #ccc);
+    color: transparent;
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -82,30 +87,35 @@ body {
 .nav-menu {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     box-shadow: var(--shadow-card);
     flex: 1;
     /* Take remaining space */
     overflow-y: auto;
+    min-height: 0;
+    /* Crucial for flex scroll */
 }
 
 .nav-section-title {
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 10px;
-    margin-top: 10px;
+    margin-bottom: 8px;
+    margin-top: 5px;
+    font-weight: 600;
 }
 
 /* Main Content (Center) - Conversation */
 .main-content {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
+    height: 100%;
+    overflow: hidden;
 }
 
 .top-bar {
@@ -113,38 +123,37 @@ body {
     justify-content: space-between;
     align-items: center;
     background: var(--bg-card);
-    padding: 15px 25px;
+    padding: 12px 20px;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
+    flex-shrink: 0;
 }
 
 .search-bar {
     background: #2C2C2C;
-    padding: 8px 15px;
+    padding: 8px 12px;
     border-radius: 20px;
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    width: 300px;
+    font-size: 0.85rem;
+    width: 250px;
     border: 1px solid transparent;
 }
 
 .active-meeting-card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 15px 20px;
     flex: 1;
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow-card);
     position: relative;
     overflow: hidden;
+    min-height: 0;
+    /* Crucial for flex nested scroll */
 }
 
-.active-meeting-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
+/* ... active-meeting-header skipped ... */
 
 .conversation-area {
     flex: 1;
@@ -152,27 +161,29 @@ body {
     padding-right: 10px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     scroll-behavior: smooth;
-    max-height: calc(100vh - 300px);
-    /* Ensure it has a max height */
+    /* Removed max-height calc, handled by flex parent */
 }
 
 /* Sidebar (Right) - Stats & Profile */
 .sidebar-right {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
+    height: 100%;
+    overflow: hidden;
 }
 
 .profile-card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 15px;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
     box-shadow: var(--shadow-card);
+    flex-shrink: 0;
 }
 
 .profile-avatar {
@@ -189,8 +200,10 @@ body {
 .metrics-card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 15px;
     box-shadow: var(--shadow-card);
+    /* For the speakers list which uses this class and needs scroll */
+    min-height: 0;
 }
 
 .stat-row {
@@ -242,14 +255,14 @@ body {
 }
 
 .config-item {
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 .config-item label {
     display: block;
     color: var(--text-secondary);
-    margin-bottom: 5px;
-    font-size: 0.85rem;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
 }
 
 .config-item select,
@@ -258,8 +271,9 @@ body {
     background: #2C2C2C;
     border: 1px solid #333;
     color: white;
-    padding: 10px;
+    padding: 8px;
     border-radius: 8px;
+    font-size: 0.9rem;
 }
 
 .config-item select:focus,
@@ -274,9 +288,9 @@ body {
     align-items: center;
     justify-content: space-between;
     background: #2C2C2C;
-    padding: 15px;
+    padding: 10px 12px;
     border-radius: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     border: 1px solid #333;
 }
 

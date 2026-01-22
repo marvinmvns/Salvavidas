@@ -6,9 +6,9 @@ numpy>=1.26.3
 scipy>=1.11.4
 
 # --- Audio & STT (Modern Versions for Python 3.12) ---
-# Using standard PyTorch (Intel/CPU optimized will be installed via extra-index-url if needed, but standard works)
-torch>=2.5.1
-torchaudio>=2.5.1
+# Pinning to 2.8.0 to match installed IPEX 2.8.0 and prevent mismatch errors
+torch==2.8.0
+torchaudio==2.8.0
 
 # Faster Whisper 1.0+ supports Python 3.11/3.12 and newer av versions
 faster-whisper>=1.0.3
@@ -57,7 +57,7 @@ speechbrain>=1.0.0
 llama-cpp-python>=0.2.77
 
 # --- Intel Optimization ---
-intel-extension-for-pytorch>=2.5.0
+intel-extension-for-pytorch==2.8.0
 openvino>=2025.0.0
 
 # --- Utils ---

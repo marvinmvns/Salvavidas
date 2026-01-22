@@ -116,6 +116,123 @@ async def health_check():
     }
 
 
+# ============================================
+# GPU Status & System Info
+# ============================================
+
+@app.get("/api/system/status")
+async def get_system_status():
+    """Get GPU and system status for UI display."""
+    gpu_device = "CPU"
+    gpu_enabled = False
+    active_processes = []
+    
+    # Check Intel GPU
+    try:
+        import intel_extension_for_pytorch as ipex
+        import torch
+        if hasattr(torch, 'xpu') and torch.xpu.is_available():
+            gpu_device = "Intel XPU"
+            gpu_enabled = True
+            active_processes.append("STT (Whisper)")
+    except Exception:
+        pass  # IPEX may fail with various errors if GPU not available
+    
+    # Check CUDA
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_device = f"CUDA ({torch.cuda.get_device_name(0)})"
+            gpu_enabled = True
+    except Exception:
+        pass
+    
+    # Get config for active features
+    if database:
+        configs = await database.get_all_configs()
+        if configs.get("enable_speaker_id"):
+            active_processes.append("Speaker ID")
+        if configs.get("enable_suggestions"):
+            active_processes.append("AI Suggestions")
+    
+    return {
+        "gpu_enabled": gpu_enabled,
+        "gpu_device": gpu_device,
+        "active_processes": active_processes,
+        "mode": "local"
+    }
+
+
+# ============================================
+# Prompt Library for Conferences
+# ============================================
+
+PROMPT_LIBRARY = {
+    "general": {
+        "name": "General",
+        "icon": "💬",
+        "prompt": "Translate accurately while maintaining the original tone and meaning.",
+        "description": "Standard translation for any context"
+    },
+    "interview": {
+        "name": "Interview",
+        "icon": "🎤",
+        "prompt": "Translate for a professional interview context. Maintain formal tone, preserve technical terms, and keep speaker intent clear.",
+        "description": "Job interviews, press interviews"
+    },
+    "tech_conference": {
+        "name": "Tech Conference",
+        "icon": "💻",
+        "prompt": "Translate technical content for software/IT context. Keep programming terms in English, translate explanations clearly.",
+        "description": "Developer talks, tech presentations"
+    },
+    "business_meeting": {
+        "name": "Business Meeting",
+        "icon": "📊",
+        "prompt": "Translate for corporate/business context. Use formal business language, preserve financial/legal terms.",
+        "description": "Corporate meetings, negotiations"
+    },
+    "medical": {
+        "name": "Medical",
+        "icon": "🏥",
+        "prompt": "Translate medical content precisely. Preserve medical terminology, ensure accuracy for patient safety.",
+        "description": "Medical consultations, health conferences"
+    },
+    "legal": {
+        "name": "Legal",
+        "icon": "⚖️",
+        "prompt": "Translate legal content with precision. Maintain legal terminology, preserve formal structure.",
+        "description": "Legal proceedings, contracts"
+    },
+    "casual": {
+        "name": "Casual Conversation",
+        "icon": "☕",
+        "prompt": "Translate casually and naturally. Use informal language, adapt idioms appropriately.",
+        "description": "Informal chats, social events"
+    },
+    "academic": {
+        "name": "Academic",
+        "icon": "🎓",
+        "prompt": "Translate academic content formally. Preserve citations, technical vocabulary, and scholarly tone.",
+        "description": "Lectures, research presentations"
+    }
+}
+
+
+@app.get("/api/prompts")
+async def get_prompt_library():
+    """Get available translation prompt presets."""
+    return PROMPT_LIBRARY
+
+
+@app.get("/api/prompts/{prompt_id}")
+async def get_prompt(prompt_id: str):
+    """Get a specific prompt by ID."""
+    if prompt_id not in PROMPT_LIBRARY:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    return PROMPT_LIBRARY[prompt_id]
+
+
 @app.get("/analytics", response_class=HTMLResponse)
 async def get_analytics():
     """Serve analytics dashboard."""

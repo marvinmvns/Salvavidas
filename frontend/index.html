@@ -15,9 +15,20 @@
     <div class="app-container">
         <!-- LEFT SIDEBAR: Navigation & Config -->
         <div class="sidebar-left">
-            <div class="logo-header">
-                <div class="logo-icon"></div>
-                <div class="logo-text">Salvavidas</div>
+            <div class="logo-header"
+                style="-webkit-app-region: drag; cursor: move; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="logo-icon"></div>
+                    <div class="logo-text">Salvavidas</div>
+                </div>
+                <div class="window-controls" style="-webkit-app-region: no-drag; display: flex; gap: 5px;">
+                    <button onclick="openSettingsWindow()" title="Settings"
+                        style="background: #333; border: none; color: #888; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px;">⚙️</button>
+                    <button onclick="minimizeWindow()" title="Minimize"
+                        style="background: #333; border: none; color: #888; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px;">─</button>
+                    <button onclick="closeWindow()" title="Close"
+                        style="background: #333; border: none; color: #888; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px;">✕</button>
+                </div>
             </div>
 
             <div class="nav-menu">
@@ -78,7 +89,38 @@
                     </label>
                 </div>
 
-                <div style="margin-top: auto;">
+                <div class="nav-section-title" style="margin-top: 20px;">Translation Context</div>
+
+                <div class="config-item">
+                    <label>Preset</label>
+                    <select id="translation_preset" onchange="loadPresetPrompt(this.value)">
+                        <option value="general">💬 General</option>
+                        <option value="interview">🎤 Interview</option>
+                        <option value="tech_conference">💻 Tech Conference</option>
+                        <option value="business_meeting">📊 Business Meeting</option>
+                        <option value="medical">🏥 Medical</option>
+                        <option value="legal">⚖️ Legal</option>
+                        <option value="casual">☕ Casual</option>
+                        <option value="academic">🎓 Academic</option>
+                    </select>
+                </div>
+
+                <div class="config-item">
+                    <label>Custom Prompt</label>
+                    <textarea id="translation_prompt" rows="3"
+                        style="width: 100%; background: #333; border: 1px solid #444; color: white; border-radius: 8px; padding: 8px; font-size: 0.8rem; resize: vertical;"
+                        placeholder="Custom translation instructions..."></textarea>
+                </div>
+
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+                    <div id="gpu-status-badge" class="gpu-badge"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #1a1a2e; border-radius: 8px; font-size: 0.75rem;">
+                        <span id="gpu-icon" style="font-size: 1rem;">💻</span>
+                        <div>
+                            <div id="gpu-device" style="font-weight: 600; color: #888;">CPU</div>
+                            <div id="gpu-processes" style="color: #555; font-size: 0.7rem;">Loading...</div>
+                        </div>
+                    </div>
                     <button class="btn btn-secondary" onclick="saveConfig()"
                         style="width: 100%; justify-content: center; font-size: 0.8rem;">
                         Save Config

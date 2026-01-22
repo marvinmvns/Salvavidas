@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Controls
     toggleOverlay: () => ipcRenderer.invoke('toggle-overlay'),
     toggleInvisible: () => ipcRenderer.invoke('toggle-invisible'),
+    openSettings: () => ipcRenderer.invoke('open-settings-window'),
+
+    // Window controls (for frameless window)
+    minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
+    closeWindow: () => ipcRenderer.invoke('window-close'),
 
     // Events
     onOpenSettings: (callback) => ipcRenderer.on('open-settings', callback),

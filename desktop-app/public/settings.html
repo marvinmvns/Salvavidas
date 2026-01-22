@@ -51,16 +51,28 @@
         .settings-header {
             background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
             border-bottom: 1px solid #333;
-            padding: 30px;
-            text-align: center;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            -webkit-app-region: drag;
+            /* Allow dragging */
+        }
+
+        .header-content {
+            text-align: left;
         }
 
         .settings-header h1 {
-            font-size: 2rem;
-            margin-bottom: 8px;
+            font-size: 1.5rem;
+            margin-bottom: 4px;
             background: linear-gradient(to right, #fff, #ccc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        .window-actions {
+            -webkit-app-region: no-drag;
         }
 
         .settings-header p {
@@ -400,8 +412,16 @@
 <body>
     <div class="settings-container">
         <div class="settings-header">
-            <h1>🚁 Salvavidas - Configurações</h1>
-            <p>Configure todas as funcionalidades do sistema</p>
+            <div class="header-content">
+                <h1>🚁 Salvavidas - Configurações</h1>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">System Preferences</p>
+            </div>
+            <div class="window-actions">
+                <button onclick="window.electronAPI.closeWindow()" title="Close"
+                    style="background: #333; border: none; color: #888; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                    ✕
+                </button>
+            </div>
         </div>
 
         <div class="tabs">
